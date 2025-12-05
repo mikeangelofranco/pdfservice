@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>{% block title %}PlugHub PDF Service{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="brand-mark">P</div>
+            <div>
+                <div class="brand-title">PlugHub</div>
+                <div class="brand-subtitle">PDF Service</div>
+            </div>
+        </div>
+        <nav class="nav-links">
+            <a href="{% url 'home' %}">Home</a>
+            <a href="{% url 'dashboard' %}">Dashboard</a>
+            {% if user.is_authenticated %}
+                <a class="pill" href="{% url 'logout' %}">Logout</a>
+            {% else %}
+                <a href="{% url 'signup' %}">Sign up</a>
+                <a class="pill" href="{% url 'login' %}">Login</a>
+            {% endif %}
+        </nav>
+    </header>
+    <main class="page">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <div>Built for fast, distraction-free PDF workflows.</div>
+        <div class="footer-links">
+            <span>© PlugHub</span>
+            <span>Privacy-first</span>
+            <span>24/7 Ready</span>
+        </div>
+    </footer>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

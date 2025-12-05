@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - PlugHub{% endblock %}
+
+{% block content %}
+<section class="section auth">
+    <div class="auth-card">
+        <h1>Create your PlugHub account</h1>
+        <p>Sign up with your email to access the PDF dashboard and keep your workspace synced.</p>
+        {% if form.non_field_errors %}
+        <div class="form-errors">
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <label for="{{ form.email.id_for_label }}">Email</label>
+            {{ form.email }}
+            {% if form.email.errors %}
+            <div class="field-errors">
+                {% for error in form.email.errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+
+            <label for="{{ form.date_of_birth.id_for_label }}">Date of birth</label>
+            {{ form.date_of_birth }}
+            {% if form.date_of_birth.errors %}
+            <div class="field-errors">
+                {% for error in form.date_of_birth.errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+
+            <label for="{{ form.password1.id_for_label }}">Password</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}
+            <div class="field-errors">
+                {% for error in form.password1.errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+
+            <label for="{{ form.password2.id_for_label }}">Confirm password</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}
+            <div class="field-errors">
+                {% for error in form.password2.errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+
+            <button class="btn primary wide" type="submit">Create account</button>
+        </form>
+        <div class="divider"><span>Already have an account?</span></div>
+        <a class="btn secondary wide" href="{% url 'login' %}">Login</a>
+    </div>
+</section>
+{% endblock %}

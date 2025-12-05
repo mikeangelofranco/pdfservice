@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}PlugHub PDF Service{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-text">
+        <p class="eyebrow">Modern | Black & White | Distraction Free</p>
+        <h1>PlugHub PDF service that behaves like a premium ad: bold, clear, impossible to ignore.</h1>
+        <p class="lead">Merge, split, compress, unlock, and transform PDFs with a studio-grade interface that keeps focus on your files.</p>
+        <div class="cta-row">
+            <a class="btn primary" href="{% url 'signup' %}">Sign up to start</a>
+            <a class="btn ghost" href="#services">See capabilities</a>
+        </div>
+        <div class="status-row">
+            <div><strong>Instant</strong> response | <strong>Secure</strong> workspace | <strong>Zero</strong> clutter</div>
+        </div>
+    </div>
+    <div class="hero-card">
+        <div class="card-header">
+            <span class="dot"></span> PlugHub Console
+        </div>
+        <div class="card-body">
+            <div class="list-title">Active tools</div>
+            <ul class="service-list">
+                {% for item in services %}
+                <li>
+                    <span class="service-name">{{ item }}</span>
+                    <span class="pill">Ready</span>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="card-foot">
+                <div>
+                    <div class="tiny-label">Latency</div>
+                    <div class="metric">45 ms</div>
+                </div>
+                <div>
+                    <div class="tiny-label">Availability</div>
+                    <div class="metric">99.9%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="services" class="section">
+    <div class="section-head">
+        <h2>Purpose-built for creators and operators</h2>
+        <p>Every control is monochrome, intentional, and optimized for quick action.</p>
+    </div>
+    <div class="grid">
+        {% for item in services %}
+        <div class="card">
+            <div class="card-title">{{ item }}</div>
+            <p>Streamlined execution with smart defaults and polished outcomes.</p>
+            <a class="text-link" href="{% url 'signup' %}">Create an account to run</a>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

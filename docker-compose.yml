@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    volumes:
+      - /srv/plughub_pdfservice/postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file:
+      - .env.docker
+    ports:
+      - "8000:8000"
+    command: ["/bin/bash", "/app/entrypoint.sh"]
+    volumes:
+      - /srv/plughub_pdfservice/staticfiles:/app/staticfiles
+
+volumes: {}

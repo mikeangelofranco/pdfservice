@@ -54,16 +54,13 @@ a {
     align-items: center;
 }
 
-.brand-mark {
-    width: 42px;
-    height: 42px;
+.brand-logo {
+    width: 46px;
+    height: 46px;
     border-radius: 12px;
     border: 1px solid var(--line);
-    display: grid;
-    place-items: center;
-    font-weight: 700;
-    letter-spacing: 1px;
-    background: linear-gradient(145deg, #0d0d0d, #141414);
+    background: #0a0a0a;
+    object-fit: cover;
     box-shadow: var(--shadow);
 }
 
@@ -1065,3 +1062,5 @@ a {
         gap: 8px;
     }
 }
+ 
+ 

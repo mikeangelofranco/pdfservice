@@ -4,3 +4,4 @@ psycopg2-binary==2.9.10
 python-dotenv==1.0.1
 Pillow==10.4.0
 pypdfium2==4.30.0
+gunicorn==23.0.0

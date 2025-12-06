@@ -1,0 +1,1665 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dashboard - PlugHub{% endblock %}
+
+{% block content %}
+<section class="section dashboard">
+    <div class="section-head">
+        <h1>Dashboard</h1>
+        <p>Welcome {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}. You're in the studio - pick a tool to launch.</p>
+    </div>
+
+    <div class="credit-panel">
+        <div class="credit-heading">
+            <span class="credit-pill">Live balance</span>
+            <span class="credit-glow"></span>
+        </div>
+        <div class="credit-label">Credits available</div>
+        <div class="credit-row">
+            <div class="credit-value">{{ credit_balance }}</div>
+            <div class="topup-wrap" {% if credit_balance > 1 %}hidden{% endif %}>
+                <button type="button" class="topup-btn" data-topup-btn>Top up</button>
+                <div class="topup-tooltip" data-topup-tip>Low credits — top up to keep working seamlessly.</div>
+            </div>
+        </div>
+        <p class="credit-note">1 credit per tool launch. Credits are tied to your purchases.</p>
+    </div>
+
+    {% if messages %}
+    <div class="message-stack">
+        {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="section-head subhead">
+        <h2>Tools</h2>
+        <p>Select a service below to launch it with your session credits.</p>
+    </div>
+
+    <div class="grid dashboard-grid">
+        {% for tool in tools %}
+        <button
+            type="button"
+            class="card action-card tool-card"
+            data-slug="{{ tool.slug }}"
+            data-name="{{ tool.name }}"
+            data-description="{{ tool.description }}"
+            data-credits="{{ credit_balance }}"
+        >
+            <div>
+                <div class="pill small">{{ forloop.counter|stringformat:"02" }}</div>
+                <div class="tool-header">
+                    <span class="tool-icon icon-{{ tool.icon|default:'generic' }}"></span>
+                    <span class="card-title">{{ tool.name }}</span>
+                </div>
+                <p>{{ tool.description }}</p>
+            </div>
+        </button>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="modal-backdrop" data-modal-backdrop hidden>
+    <div class="modal">
+        <div class="modal-head">
+            <div>
+                <div class="pill small" data-modal-pill></div>
+                <h3 data-modal-title></h3>
+                <div class="modal-meta">
+                    <div class="modal-credit-wrap">
+                        <span class="chip credit-chip">Credits: <span data-modal-balance>{{ credit_balance }}</span></span>
+                        <div class="topup-wrap modal" {% if credit_balance > 1 %}hidden{% endif %}>
+                            <button type="button" class="topup-btn small" data-modal-topup-btn>Top up</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="close-btn" type="button" data-modal-close aria-label="Close modal">✕</button>
+        </div>
+        <p class="modal-description" data-modal-description></p>
+
+        <div class="lock-fields" data-lock-fields hidden>
+            <label class="field-label">PDF file</label>
+            <label class="file-drop" data-file-drop>
+                <input type="file" accept="application/pdf" data-lock-file>
+                <span class="file-drop-text" data-file-drop-text>Drop PDF or click to upload</span>
+            </label>
+
+            <label class="field-label" data-password-label>Password</label>
+            <input type="password" data-lock-password placeholder="Enter a password to protect the PDF" required>
+
+            <div class="download-wrap" data-download-wrap hidden>
+                <a class="btn primary" data-download-link download>Download unlocked PDF</a>
+                <span class="download-note" data-download-note>This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="merge-fields" data-merge-fields hidden>
+            <label class="field-label">PDF files</label>
+            <label class="file-drop" data-merge-drop>
+                <input type="file" accept="application/pdf" data-merge-input multiple>
+                <span class="file-drop-text">Drop PDFs or click to upload (drag to reorder)</span>
+            </label>
+            <div class="merge-list" data-merge-list>
+                <div class="merge-empty" data-merge-empty>No files added yet.</div>
+            </div>
+            <div class="download-wrap" data-merge-download-wrap hidden>
+                <a class="btn primary" data-merge-download-link download>Download merged PDF</a>
+                <span class="download-note">This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="split-fields" data-split-fields hidden>
+            <label class="field-label">PDF file</label>
+            <label class="file-drop" data-split-drop>
+                <input type="file" accept="application/pdf" data-split-input>
+                <span class="file-drop-text" data-split-text>Drop PDF or click to upload</span>
+            </label>
+            <div class="download-wrap" data-split-download-wrap hidden>
+                <a class="btn primary" data-split-download-link download>Download PDF</a>
+                <span class="download-note">This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="toimage-fields" data-toimage-fields hidden>
+            <label class="field-label">PDF file</label>
+            <label class="file-drop" data-toimage-drop>
+                <input type="file" accept="application/pdf" data-toimage-input>
+                <span class="file-drop-text" data-toimage-text>Drop PDF or click to upload</span>
+            </label>
+            <div class="download-wrap" data-toimage-download-wrap hidden>
+                <a class="btn primary" data-toimage-download-link download>Download Image</a>
+                <span class="download-note">This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="imagetopdf-fields" data-imagetopdf-fields hidden>
+            <label class="field-label">Images</label>
+            <label class="file-drop" data-imagetopdf-drop>
+                <input type="file" accept="image/*" data-imagetopdf-input multiple>
+                <span class="file-drop-text" data-imagetopdf-text>Drop images or click to upload</span>
+            </label>
+            <div class="download-wrap" data-imagetopdf-download-wrap hidden>
+                <a class="btn primary" data-imagetopdf-download-link download>Download PDF</a>
+                <span class="download-note">This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="remove-fields" data-remove-fields hidden>
+            <label class="field-label">PDF file</label>
+            <label class="file-drop" data-remove-drop>
+                <input type="file" accept="application/pdf" data-remove-input>
+                <span class="file-drop-text" data-remove-text>Drop PDF or click to upload</span>
+            </label>
+            <div class="pages-box">
+                <div class="pages-header">
+                    <span class="field-label">Pages to remove</span>
+                    <button type="button" class="btn ghost small" data-remove-select-all>Select all</button>
+                    <button type="button" class="btn ghost small" data-remove-clear>Clear</button>
+                </div>
+                <div class="pages-list" data-remove-pages-list>
+                    <div class="merge-empty" data-remove-empty>No pages loaded yet.</div>
+                </div>
+            </div>
+            <div class="download-wrap" data-remove-download-wrap hidden>
+                <a class="btn primary" data-remove-download-link download>Download PDF</a>
+                <span class="download-note">This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="redact-fields" data-redact-fields hidden>
+            <label class="field-label">PDF file</label>
+            <label class="file-drop" data-redact-drop>
+                <input type="file" accept="application/pdf" data-redact-input>
+                <span class="file-drop-text" data-redact-text>Drop PDF or click to upload</span>
+            </label>
+            <div class="tags-box">
+                <div class="tags-list" data-redact-terms>
+                    <div class="merge-empty">No terms selected yet.</div>
+                </div>
+                <div class="tags-suggestions">
+                    <div class="field-label">Suggested terms</div>
+                    <div class="tags-search">
+                        <input type="search" placeholder="Search suggested terms" data-redact-search>
+                    </div>
+                    <div class="tags-list" data-redact-suggestions>
+                        <div class="merge-empty">Upload a PDF to load suggestions.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="download-wrap" data-redact-download-wrap hidden>
+                <a class="btn primary" data-redact-download-link download>Download PDF</a>
+                <span class="download-note">This will cost 1 credit</span>
+            </div>
+        </div>
+
+        <div class="credit-warning" data-credit-warning hidden>
+            Low credits. You have {{ credit_balance }} remaining. One credit is deducted when you launch.
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn ghost" type="button" data-modal-close>Cancel</button>
+            <button class="btn primary" type="button" data-modal-submit>Split PDF</button>
+        </div>
+        <div class="modal-message" data-modal-message></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const backdrop = document.querySelector('[data-modal-backdrop]');
+        const titleEl = document.querySelector('[data-modal-title]');
+        const descEl = document.querySelector('[data-modal-description]');
+        const pillEl = document.querySelector('[data-modal-pill]');
+        const submitBtn = document.querySelector('[data-modal-submit]');
+        const messageEl = document.querySelector('[data-modal-message]');
+        const warningEl = document.querySelector('[data-credit-warning]');
+        const modalBalanceEl = document.querySelector('[data-modal-balance]');
+        const topupBtn = document.querySelector('[data-topup-btn]');
+        const modalTopupBtn = document.querySelector('[data-modal-topup-btn]');
+        const paymentUrl = "{% url 'payment' %}";
+        const lockFields = document.querySelector('[data-lock-fields]');
+        const fileDrop = document.querySelector('[data-file-drop]');
+        const pdfInput = document.querySelector('[data-lock-file]');
+        const passwordInput = document.querySelector('[data-lock-password]');
+        const downloadWrap = document.querySelector('[data-download-wrap]');
+        const downloadLink = document.querySelector('[data-download-link]');
+        const fileDropText = document.querySelector('[data-file-drop-text]');
+        const passwordLabel = document.querySelector('[data-password-label]');
+        const mergeFields = document.querySelector('[data-merge-fields]');
+        const mergeInput = document.querySelector('[data-merge-input]');
+        const mergeList = document.querySelector('[data-merge-list]');
+        const mergeEmpty = document.querySelector('[data-merge-empty]');
+        const mergeDownloadWrap = document.querySelector('[data-merge-download-wrap]');
+        const mergeDownloadLink = document.querySelector('[data-merge-download-link]');
+        const splitFields = document.querySelector('[data-split-fields]');
+        const splitInput = document.querySelector('[data-split-input]');
+        const splitDrop = document.querySelector('[data-split-drop]');
+        const splitDropText = document.querySelector('[data-split-text]');
+        const splitDownloadWrap = document.querySelector('[data-split-download-wrap]');
+        const splitDownloadLink = document.querySelector('[data-split-download-link]');
+        const toImageFields = document.querySelector('[data-toimage-fields]');
+        const toImageInput = document.querySelector('[data-toimage-input]');
+        const toImageDrop = document.querySelector('[data-toimage-drop]');
+        const toImageDropText = document.querySelector('[data-toimage-text]');
+        const toImageDownloadWrap = document.querySelector('[data-toimage-download-wrap]');
+        const toImageDownloadLink = document.querySelector('[data-toimage-download-link]');
+        const imageToPdfFields = document.querySelector('[data-imagetopdf-fields]');
+        const imageToPdfInput = document.querySelector('[data-imagetopdf-input]');
+        const imageToPdfDrop = document.querySelector('[data-imagetopdf-drop]');
+        const imageToPdfDropText = document.querySelector('[data-imagetopdf-text]');
+        const imageToPdfDownloadWrap = document.querySelector('[data-imagetopdf-download-wrap]');
+        const imageToPdfDownloadLink = document.querySelector('[data-imagetopdf-download-link]');
+        const removeFields = document.querySelector('[data-remove-fields]');
+        const removeInput = document.querySelector('[data-remove-input]');
+        const removeDrop = document.querySelector('[data-remove-drop]');
+        const removeDropText = document.querySelector('[data-remove-text]');
+        const removeDownloadWrap = document.querySelector('[data-remove-download-wrap]');
+        const removeDownloadLink = document.querySelector('[data-remove-download-link]');
+        const removePagesInput = document.querySelector('[data-remove-pages]');
+        const removePagesList = document.querySelector('[data-remove-pages-list]');
+        const redactFields = document.querySelector('[data-redact-fields]');
+        const redactDrop = document.querySelector('[data-redact-drop]');
+        const redactDropText = document.querySelector('[data-redact-text]');
+        const redactInput = document.querySelector('[data-redact-input]');
+        const redactTermsList = document.querySelector('[data-redact-terms]');
+        const redactDownloadWrap = document.querySelector('[data-redact-download-wrap]');
+        const redactDownloadLink = document.querySelector('[data-redact-download-link]');
+        const redactSuggestionsList = document.querySelector('[data-redact-suggestions]');
+        const redactSearchInput = document.querySelector('[data-redact-search]');
+        let removePreviews = [];
+        let currentSlug = null;
+        let currentCredits = {{ credit_balance }};
+        const defaultDropText = 'Drop PDF or click to upload';
+        let downloadReady = false;
+        let downloaded = false;
+        let mergeFiles = [];
+        let splitFile = null;
+        let toImageFile = null;
+        let imageToPdfFiles = [];
+        let removeFile = null;
+        let removeTotalPages = 0;
+        let removeSelected = new Set();
+        let redactFile = null;
+        let redactTerms = [];
+        let redactSuggested = [];
+        let redactSearchTerm = '';
+
+        if (!backdrop || !submitBtn) return;
+
+        function getCSRF() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && meta.content) return meta.content;
+            const match = document.cookie.match(/csrftoken=([^;]+)/);
+            return match ? match[1] : '';
+        }
+
+        function goToPayment() {
+            window.location.href = paymentUrl;
+        }
+
+        if (topupBtn) {
+            topupBtn.addEventListener('click', goToPayment);
+        }
+        if (modalTopupBtn) {
+            modalTopupBtn.addEventListener('click', goToPayment);
+        }
+
+        function updateCreditsUI(credits) {
+            currentCredits = credits;
+            document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = credits);
+            const creditValue = document.querySelector('.credit-value');
+            if (creditValue) creditValue.textContent = credits;
+            if (modalBalanceEl) modalBalanceEl.textContent = credits;
+            if (topupBtn) {
+                const wrap = topupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(credits <= 1);
+                topupBtn.hidden = !(credits <= 1);
+            }
+            if (modalTopupBtn) {
+                const wrap = modalTopupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(credits <= 1);
+                modalTopupBtn.hidden = !(credits <= 1);
+            }
+            if (warningEl) {
+                warningEl.hidden = credits > 1;
+                warningEl.textContent = `Low credits. You have ${credits} remaining. One credit is deducted when you launch.`;
+            }
+        }
+
+        function openModal(btn) {
+            currentSlug = btn.dataset.slug;
+            const name = btn.dataset.name;
+            const desc = btn.dataset.description;
+            const creditsLeft = parseInt(btn.dataset.credits, 10) || currentCredits || 0;
+            const isLock = currentSlug === 'pdf-lock';
+            const isUnlock = currentSlug === 'pdf-unlock';
+            const isMerge = currentSlug === 'pdf-merge';
+            const isSplit = currentSlug === 'pdf-split';
+            const isToImage = currentSlug === 'pdf-to-image';
+            const isImageToPdf = currentSlug === 'image-to-pdf';
+            const isRemove = currentSlug === 'remove-pages';
+            const isRedact = currentSlug === 'redact-text';
+
+            titleEl.textContent = name;
+            descEl.textContent = desc;
+            pillEl.textContent = name.split(' ').map(w => w[0]).join('').toUpperCase();
+            messageEl.textContent = '';
+            messageEl.classList.remove('error', 'warning', 'info');
+            warningEl.hidden = creditsLeft > 1;
+            warningEl.textContent = `Low credits. You have ${creditsLeft} remaining. One credit is deducted when you launch.`;
+            if (modalBalanceEl) modalBalanceEl.textContent = creditsLeft;
+            if (topupBtn) {
+                const wrap = topupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(creditsLeft <= 1);
+                topupBtn.hidden = !(creditsLeft <= 1);
+            }
+            if (modalTopupBtn) {
+                const wrap = modalTopupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(creditsLeft <= 1);
+                modalTopupBtn.hidden = !(creditsLeft <= 1);
+            }
+            if (lockFields) {
+                lockFields.hidden = !(isLock || isUnlock);
+                lockFields.style.display = (isLock || isUnlock) ? 'grid' : 'none';
+            }
+            if (mergeFields) {
+                mergeFields.hidden = !isMerge;
+                mergeFields.style.display = isMerge ? 'grid' : 'none';
+            }
+            if (splitFields) {
+                splitFields.hidden = !isSplit;
+                splitFields.style.display = isSplit ? 'grid' : 'none';
+            }
+            if (toImageFields) {
+                toImageFields.hidden = !isToImage;
+                toImageFields.style.display = isToImage ? 'grid' : 'none';
+            }
+            if (imageToPdfFields) {
+                imageToPdfFields.hidden = !isImageToPdf;
+                imageToPdfFields.style.display = isImageToPdf ? 'grid' : 'none';
+            }
+            if (removeFields) {
+                removeFields.hidden = !isRemove;
+                removeFields.style.display = isRemove ? 'grid' : 'none';
+            }
+            if (redactFields) {
+                redactFields.hidden = !isRedact;
+                redactFields.style.display = isRedact ? 'grid' : 'none';
+            }
+            if (submitBtn) submitBtn.textContent = isLock ? 'Lock PDF' : (isUnlock ? 'Unlock PDF' : (isMerge ? 'Merge PDF' : (isSplit ? 'Split PDF' : (isToImage ? 'Convert to Image' : (isImageToPdf ? 'Convert to PDF' : (isRemove ? 'Remove page' : (isRedact ? 'Redact text' : 'Launch service')))))));
+            if (passwordLabel) passwordLabel.textContent = isUnlock ? 'Password to unlock' : 'Password';
+            if (passwordInput) {
+                passwordInput.placeholder = isUnlock ? 'Enter the password to unlock the PDF' : 'Enter a password to protect the PDF';
+            }
+            if (downloadLink) downloadLink.textContent = isUnlock ? 'Download unlocked PDF' : (isLock ? 'Download locked PDF' : 'Download PDF');
+            if (mergeDownloadLink) mergeDownloadLink.textContent = 'Download merged PDF';
+            if (pdfInput) pdfInput.value = '';
+            if (passwordInput) passwordInput.value = '';
+            syncFileLabel();
+            if (splitInput) splitInput.value = '';
+            if (splitDropText) splitDropText.textContent = defaultDropText;
+            if (splitDrop) splitDrop.classList.remove('has-file');
+            if (downloadWrap) {
+                downloadWrap.hidden = true;
+                if (downloadLink) {
+                    downloadLink.removeAttribute('href');
+                    downloadLink.classList.add('disabled');
+                    downloadLink.setAttribute('aria-disabled', 'true');
+                    downloadLink.classList.remove('highlight');
+                }
+            }
+            if (mergeDownloadWrap && mergeDownloadLink) {
+                mergeDownloadWrap.hidden = true;
+                mergeDownloadLink.removeAttribute('href');
+                mergeDownloadLink.classList.add('disabled');
+                mergeDownloadLink.setAttribute('aria-disabled', 'true');
+                mergeDownloadLink.classList.remove('highlight');
+            }
+            if (splitDownloadWrap && splitDownloadLink) {
+                splitDownloadWrap.hidden = true;
+                splitDownloadLink.removeAttribute('href');
+                splitDownloadLink.classList.add('disabled');
+                splitDownloadLink.setAttribute('aria-disabled', 'true');
+                splitDownloadLink.classList.remove('highlight');
+            }
+            if (toImageDownloadWrap && toImageDownloadLink) {
+                toImageDownloadWrap.hidden = true;
+                toImageDownloadLink.removeAttribute('href');
+                toImageDownloadLink.classList.add('disabled');
+                toImageDownloadLink.setAttribute('aria-disabled', 'true');
+                toImageDownloadLink.classList.remove('highlight');
+            }
+            if (imageToPdfDownloadWrap && imageToPdfDownloadLink) {
+                imageToPdfDownloadWrap.hidden = true;
+                imageToPdfDownloadLink.removeAttribute('href');
+                imageToPdfDownloadLink.classList.add('disabled');
+                imageToPdfDownloadLink.setAttribute('aria-disabled', 'true');
+                imageToPdfDownloadLink.classList.remove('highlight');
+            }
+            if (removeDownloadWrap && removeDownloadLink) {
+                removeDownloadWrap.hidden = true;
+                removeDownloadLink.removeAttribute('href');
+                removeDownloadLink.classList.add('disabled');
+                removeDownloadLink.setAttribute('aria-disabled', 'true');
+                removeDownloadLink.classList.remove('highlight');
+            }
+            if (redactDownloadWrap && redactDownloadLink) {
+                redactDownloadWrap.hidden = true;
+                redactDownloadLink.removeAttribute('href');
+                redactDownloadLink.classList.add('disabled');
+                redactDownloadLink.setAttribute('aria-disabled', 'true');
+                redactDownloadLink.classList.remove('highlight');
+            }
+            mergeFiles = [];
+            renderMergeList();
+            splitFile = null;
+            toImageFile = null;
+            if (toImageInput) toImageInput.value = '';
+            if (toImageDropText) toImageDropText.textContent = defaultDropText;
+            if (toImageDrop) toImageDrop.classList.remove('has-file');
+            imageToPdfFiles = [];
+            if (imageToPdfInput) imageToPdfInput.value = '';
+            if (imageToPdfDropText) imageToPdfDropText.textContent = 'Drop images or click to upload';
+            if (imageToPdfDrop) imageToPdfDrop.classList.remove('has-file');
+            removeFile = null;
+            if (removeInput) removeInput.value = '';
+            if (removeDropText) removeDropText.textContent = defaultDropText;
+            if (removeDrop) removeDrop.classList.remove('has-file');
+            removeTotalPages = 0;
+            removeSelected = new Set();
+            if (removePagesList) {
+                removePagesList.innerHTML = '<div class="merge-empty" data-remove-empty>No pages loaded yet.</div>';
+            }
+            redactFile = null;
+            redactTerms = [];
+            redactSearchTerm = '';
+            if (redactSearchInput) redactSearchInput.value = '';
+            redactSuggested = [];
+            if (redactDropText) redactDropText.textContent = defaultDropText;
+            if (redactDrop) redactDrop.classList.remove('has-file');
+            renderRedactTerms();
+            renderRedactSuggestions();
+            downloadReady = false;
+            downloaded = false;
+            backdrop.hidden = false;
+        }
+
+        function closeModal() {
+            if (downloadReady && !downloaded) {
+                messageEl.textContent = currentSlug === 'pdf-unlock'
+                    ? 'Download your unlocked PDF now; closing will clear the link and require another credit.'
+                    : currentSlug === 'pdf-merge'
+                        ? 'Download your merged PDF now; closing will clear the link and require another credit.'
+                    : currentSlug === 'pdf-split'
+                        ? 'Download your split PDF now; closing will clear the link and require another credit.'
+                        : currentSlug === 'pdf-to-image'
+                            ? 'Download your converted images now; closing will clear the link and require another credit.'
+                        : currentSlug === 'image-to-pdf'
+                            ? 'Download your converted PDF now; closing will clear the link and require another credit.'
+                        : currentSlug === 'redact-text'
+                            ? 'Download your redacted PDF now; closing will clear the link and require another credit.'
+                        : 'Download your locked PDF now; closing will clear the link and require another credit.';
+                messageEl.classList.remove('error', 'info');
+                messageEl.classList.add('warning');
+                if (downloadLink) downloadLink.classList.add('highlight');
+                if (mergeDownloadLink) mergeDownloadLink.classList.add('highlight');
+                if (splitDownloadLink) splitDownloadLink.classList.add('highlight');
+                if (toImageDownloadLink) toImageDownloadLink.classList.add('highlight');
+                if (imageToPdfDownloadLink) imageToPdfDownloadLink.classList.add('highlight');
+                if (redactDownloadLink) redactDownloadLink.classList.add('highlight');
+                return;
+            }
+            backdrop.hidden = true;
+            currentSlug = null;
+            downloadReady = false;
+            downloaded = false;
+        }
+
+        function handleSubmit() {
+            if (!currentSlug) return;
+            if (downloadReady && !downloaded && currentSlug === 'pdf-lock') {
+                messageEl.textContent = 'Download your current locked PDF before locking again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'pdf-unlock') {
+                messageEl.textContent = 'Download your current unlocked PDF before running unlock again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'pdf-merge') {
+                messageEl.textContent = 'Download your current merged PDF before merging again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'pdf-split') {
+                messageEl.textContent = 'Download your current split PDF before splitting again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'pdf-to-image') {
+                messageEl.textContent = 'Download your converted images before converting again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'image-to-pdf') {
+                messageEl.textContent = 'Download your converted PDF before converting again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'remove-pages') {
+                messageEl.textContent = 'Download your updated PDF before removing pages again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'redact-text') {
+                messageEl.textContent = 'Download your redacted PDF before redacting again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (currentSlug === 'pdf-lock') {
+                return handlePdfLock();
+            }
+            if (currentSlug === 'pdf-unlock') {
+                return handlePdfUnlock();
+            }
+            if (currentSlug === 'pdf-merge') {
+                return handlePdfMerge();
+            }
+            if (currentSlug === 'pdf-split') {
+                return handlePdfSplit();
+            }
+            if (currentSlug === 'pdf-to-image') {
+                return handlePdfToImage();
+            }
+            if (currentSlug === 'image-to-pdf') {
+                return handleImageToPdf();
+            }
+            if (currentSlug === 'remove-pages') {
+                return handleRemovePages();
+            }
+            if (currentSlug === 'redact-text') {
+                return handleRedact();
+            }
+            messageEl.textContent = 'Launching...';
+            fetch(`{% url 'use_tool' slug='__slug__' %}`.replace('__slug__', currentSlug), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({}),
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to launch service.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'Queued.';
+            }).catch(err => {
+               messageEl.textContent = err.message || 'Unable to launch service.';
+           });
+       }
+
+        function syncFileLabel() {
+            if (!fileDropText) return;
+            if (pdfInput && pdfInput.files && pdfInput.files.length > 0) {
+                const name = pdfInput.files[0].name;
+                fileDropText.textContent = name;
+                if (fileDrop) fileDrop.classList.add('has-file');
+            } else {
+                fileDropText.textContent = defaultDropText;
+                if (fileDrop) fileDrop.classList.remove('has-file');
+            }
+        }
+
+        function handlePdfLock() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!pdfInput || !pdfInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (passwordInput && !passwordInput.value.trim()) {
+                messageEl.textContent = 'Password is required to lock the PDF.';
+                passwordInput.focus();
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('pdf', pdfInput.files[0]);
+            if (passwordInput && passwordInput.value) {
+                formData.append('password', passwordInput.value);
+            }
+
+            messageEl.textContent = 'Locking PDF...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'pdf_lock' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to lock PDF.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'PDF locked.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && downloadLink && downloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = data.file_name || 'locked.pdf';
+                    downloadLink.classList.remove('disabled');
+                    downloadLink.removeAttribute('aria-disabled');
+                    downloadLink.classList.add('highlight');
+                    downloadWrap.hidden = false;
+                    syncFileLabel();
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to lock PDF.';
+                if (downloadWrap && downloadLink) {
+                    downloadWrap.hidden = true;
+                    downloadLink.removeAttribute('href');
+                    downloadLink.classList.add('disabled');
+                    downloadLink.setAttribute('aria-disabled', 'true');
+                    downloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        if (pdfInput) {
+            pdfInput.addEventListener('change', syncFileLabel);
+        }
+
+        function handlePdfUnlock() {
+            if (!pdfInput || !pdfInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (passwordInput && !passwordInput.value.trim()) {
+                messageEl.textContent = 'Password is required to unlock the PDF.';
+                passwordInput.focus();
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            // reset download state before attempt
+            if (downloadWrap && downloadLink) {
+                downloadWrap.hidden = true;
+                downloadLink.removeAttribute('href');
+                downloadLink.classList.add('disabled');
+                downloadLink.setAttribute('aria-disabled', 'true');
+                downloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+            const formData = new FormData();
+            formData.append('pdf', pdfInput.files[0]);
+            if (passwordInput && passwordInput.value) {
+                formData.append('password', passwordInput.value);
+            }
+
+            messageEl.textContent = 'Unlocking PDF...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'pdf_unlock' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to unlock PDF.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'PDF unlocked.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && downloadLink && downloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = data.file_name || 'unlocked.pdf';
+                    downloadLink.classList.remove('disabled');
+                    downloadLink.removeAttribute('aria-disabled');
+                    downloadLink.classList.add('highlight');
+                    downloadWrap.hidden = false;
+                    syncFileLabel();
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to unlock PDF.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (downloadWrap && downloadLink) {
+                    downloadWrap.hidden = true;
+                    downloadLink.removeAttribute('href');
+                    downloadLink.classList.add('disabled');
+                    downloadLink.setAttribute('aria-disabled', 'true');
+                    downloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        function renderMergeList() {
+            if (!mergeList || !mergeEmpty) return;
+            mergeList.innerHTML = '';
+            if (!mergeFiles.length) {
+                mergeList.appendChild(mergeEmpty);
+                mergeEmpty.hidden = false;
+                return;
+            }
+            mergeEmpty.hidden = true;
+            mergeFiles.forEach((file, idx) => {
+                const item = document.createElement('div');
+                item.className = 'merge-item';
+                item.draggable = true;
+                item.dataset.index = idx;
+                item.innerHTML = `<span class="pill small drag-handle">⇅</span><span>${file.name}</span>`;
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', idx.toString());
+                });
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                    const to = idx;
+                    if (isNaN(from) || isNaN(to) || from === to) return;
+                    const updated = [...mergeFiles];
+                    const [moved] = updated.splice(from, 1);
+                    updated.splice(to, 0, moved);
+                    mergeFiles = updated;
+                    renderMergeList();
+                });
+                mergeList.appendChild(item);
+            });
+        }
+
+        function handleMergeInputChange() {
+            if (!mergeInput || !mergeInput.files) return;
+            mergeFiles = Array.from(mergeInput.files);
+            renderMergeList();
+        }
+
+        function handlePdfMerge() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!mergeFiles.length) {
+                messageEl.textContent = 'Upload PDFs to merge.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (mergeFiles.length < 2) {
+                messageEl.textContent = 'Add two or more PDFs to merge.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (mergeDownloadWrap && mergeDownloadLink) {
+                mergeDownloadWrap.hidden = true;
+                mergeDownloadLink.removeAttribute('href');
+                mergeDownloadLink.classList.add('disabled');
+                mergeDownloadLink.setAttribute('aria-disabled', 'true');
+                mergeDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            mergeFiles.forEach(file => formData.append('pdfs', file));
+
+            messageEl.textContent = 'Merging PDFs...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'pdf_merge' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to merge PDFs.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'PDFs merged.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && mergeDownloadLink && mergeDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    mergeDownloadLink.href = url;
+                    mergeDownloadLink.download = data.file_name || 'merged.pdf';
+                    mergeDownloadLink.classList.remove('disabled');
+                    mergeDownloadLink.removeAttribute('aria-disabled');
+                    mergeDownloadLink.classList.add('highlight');
+                    mergeDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to merge PDFs.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (mergeDownloadWrap && mergeDownloadLink) {
+                    mergeDownloadWrap.hidden = true;
+                    mergeDownloadLink.removeAttribute('href');
+                    mergeDownloadLink.classList.add('disabled');
+                    mergeDownloadLink.setAttribute('aria-disabled', 'true');
+                    mergeDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        function handlePdfSplit() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!splitInput || !splitInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (splitDownloadWrap && splitDownloadLink) {
+                splitDownloadWrap.hidden = true;
+                splitDownloadLink.removeAttribute('href');
+                splitDownloadLink.classList.add('disabled');
+                splitDownloadLink.setAttribute('aria-disabled', 'true');
+                splitDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            formData.append('pdf', splitInput.files[0]);
+
+            messageEl.textContent = 'Splitting PDF...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'pdf_split' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to split PDF.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'PDF split.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && splitDownloadLink && splitDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/zip' });
+                    const url = URL.createObjectURL(blob);
+                    splitDownloadLink.href = url;
+                    splitDownloadLink.download = data.file_name || 'split_pages.zip';
+                    splitDownloadLink.classList.remove('disabled');
+                    splitDownloadLink.removeAttribute('aria-disabled');
+                    splitDownloadLink.classList.add('highlight');
+                    splitDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to split PDF.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (splitDownloadWrap && splitDownloadLink) {
+                    splitDownloadWrap.hidden = true;
+                    splitDownloadLink.removeAttribute('href');
+                    splitDownloadLink.classList.add('disabled');
+                    splitDownloadLink.setAttribute('aria-disabled', 'true');
+                    splitDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        document.querySelectorAll('.tool-card').forEach(btn => {
+            btn.addEventListener('click', () => openModal(btn));
+        });
+
+        document.querySelectorAll('[data-modal-close]').forEach(btn => {
+            btn.addEventListener('click', closeModal);
+        });
+
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) closeModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && backdrop.hidden === false) closeModal();
+        });
+
+        submitBtn.addEventListener('click', handleSubmit);
+
+        if (downloadLink) {
+            downloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                downloadLink.classList.remove('highlight');
+            });
+        }
+
+        function handlePdfToImage() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!toImageInput || !toImageInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (toImageDownloadWrap && toImageDownloadLink) {
+                toImageDownloadWrap.hidden = true;
+                toImageDownloadLink.removeAttribute('href');
+                toImageDownloadLink.classList.add('disabled');
+                toImageDownloadLink.setAttribute('aria-disabled', 'true');
+                toImageDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            formData.append('pdf', toImageInput.files[0]);
+
+            messageEl.textContent = 'Converting to images...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'pdf_to_image' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to convert PDF to images.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'PDF converted.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && toImageDownloadLink && toImageDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/zip' });
+                    const url = URL.createObjectURL(blob);
+                    toImageDownloadLink.href = url;
+                    toImageDownloadLink.download = data.file_name || 'pdf_images.zip';
+                    toImageDownloadLink.classList.remove('disabled');
+                    toImageDownloadLink.removeAttribute('aria-disabled');
+                    toImageDownloadLink.classList.add('highlight');
+                    toImageDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to convert PDF to images.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (toImageDownloadWrap && toImageDownloadLink) {
+                    toImageDownloadWrap.hidden = true;
+                    toImageDownloadLink.removeAttribute('href');
+                    toImageDownloadLink.classList.add('disabled');
+                    toImageDownloadLink.setAttribute('aria-disabled', 'true');
+                    toImageDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        function handleImageToPdf() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!imageToPdfFiles.length) {
+                messageEl.textContent = 'Upload images to convert.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (imageToPdfDownloadWrap && imageToPdfDownloadLink) {
+                imageToPdfDownloadWrap.hidden = true;
+                imageToPdfDownloadLink.removeAttribute('href');
+                imageToPdfDownloadLink.classList.add('disabled');
+                imageToPdfDownloadLink.setAttribute('aria-disabled', 'true');
+                imageToPdfDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            imageToPdfFiles.forEach(img => formData.append('images', img));
+
+            messageEl.textContent = 'Converting images...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'image_to_pdf' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to convert images to PDF.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'Images converted.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && imageToPdfDownloadLink && imageToPdfDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    imageToPdfDownloadLink.href = url;
+                    imageToPdfDownloadLink.download = data.file_name || 'images.pdf';
+                    imageToPdfDownloadLink.classList.remove('disabled');
+                    imageToPdfDownloadLink.removeAttribute('aria-disabled');
+                    imageToPdfDownloadLink.classList.add('highlight');
+                    imageToPdfDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to convert images to PDF.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (imageToPdfDownloadWrap && imageToPdfDownloadLink) {
+                    imageToPdfDownloadWrap.hidden = true;
+                    imageToPdfDownloadLink.removeAttribute('href');
+                    imageToPdfDownloadLink.classList.add('disabled');
+                    imageToPdfDownloadLink.setAttribute('aria-disabled', 'true');
+                    imageToPdfDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        function handleRemovePages() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!removeInput || !removeInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!removeSelected.size) {
+                messageEl.textContent = 'Select at least one page to remove.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (removeTotalPages && removeSelected.size >= removeTotalPages) {
+                messageEl.textContent = 'Cannot remove all pages.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (removeDownloadWrap && removeDownloadLink) {
+                removeDownloadWrap.hidden = true;
+                removeDownloadLink.removeAttribute('href');
+                removeDownloadLink.classList.add('disabled');
+                removeDownloadLink.setAttribute('aria-disabled', 'true');
+                removeDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            formData.append('pdf', removeInput.files[0]);
+            if (removeSelected.size) {
+                const pagesSpec = Array.from(removeSelected).map(n => n + 1).sort((a,b) => a-b).join(',');
+                formData.append('pages', pagesSpec);
+            }
+
+            messageEl.textContent = 'Removing page...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'remove_pages' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to remove pages.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'Pages removed.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && removeDownloadLink && removeDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    removeDownloadLink.href = url;
+                    removeDownloadLink.download = data.file_name || 'trimmed.pdf';
+                    removeDownloadLink.classList.remove('disabled');
+                    removeDownloadLink.removeAttribute('aria-disabled');
+                    removeDownloadLink.classList.add('highlight');
+                    removeDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to remove pages.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (removeDownloadWrap && removeDownloadLink) {
+                    removeDownloadWrap.hidden = true;
+                    removeDownloadLink.removeAttribute('href');
+                    removeDownloadLink.classList.add('disabled');
+                    removeDownloadLink.setAttribute('aria-disabled', 'true');
+                    removeDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        function renderRedactTerms() {
+            if (!redactTermsList) return;
+            if (!redactTerms.length) {
+                redactTermsList.innerHTML = '<div class="merge-empty">No terms added yet.</div>';
+                return;
+            }
+            const chips = redactTerms.map(term => `<span class="tag-chip" data-term="${term}">${term}<button type="button" data-remove-term="${term}">✕</button></span>`).join('');
+            redactTermsList.innerHTML = chips;
+            redactTermsList.querySelectorAll('[data-remove-term]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const t = btn.dataset.removeTerm;
+                    redactTerms = redactTerms.filter(x => x !== t);
+                    renderRedactTerms();
+                    renderRedactSuggestions();
+                });
+            });
+        }
+
+        function addRedactTerm(term) {
+            const clean = term.trim();
+            if (!clean) return;
+            if (!redactTerms.includes(clean)) {
+                redactTerms.push(clean);
+                renderRedactTerms();
+                renderRedactSuggestions();
+            }
+        }
+
+        function renderRedactSuggestions() {
+            if (!redactSuggestionsList) return;
+            const filtered = (redactSuggested || []).filter(term => {
+                if (!redactSearchTerm) return true;
+                return term.toLowerCase().includes(redactSearchTerm.toLowerCase());
+            });
+            if (!filtered.length) {
+                const message = redactSuggested.length
+                    ? 'No matches for your search.'
+                    : 'Upload a PDF to load suggestions.';
+                redactSuggestionsList.innerHTML = `<div class="merge-empty">${message}</div>`;
+                return;
+            }
+            const options = filtered.map(term => {
+                const checked = redactTerms.includes(term) ? 'checked' : '';
+                return `<label class="tag-chip selectable"><input type="checkbox" data-suggest-term="${term}" ${checked}>${term}</label>`;
+            }).join('');
+            redactSuggestionsList.innerHTML = options;
+            redactSuggestionsList.querySelectorAll('[data-suggest-term]').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const term = e.target.dataset.suggestTerm;
+                    if (e.target.checked) {
+                        addRedactTerm(term);
+                    } else {
+                        redactTerms = redactTerms.filter(x => x !== term);
+                        renderRedactTerms();
+                    }
+                    renderRedactSuggestions();
+                });
+            });
+        }
+
+        async function fetchRedactSuggestions(file) {
+            if (!file) {
+                redactSuggested = [];
+                renderRedactSuggestions();
+                return;
+            }
+            const formData = new FormData();
+            formData.append('pdf', file);
+            messageEl.textContent = 'Scanning PDF for suggested terms...';
+            messageEl.classList.remove('error', 'warning');
+            messageEl.classList.add('info');
+            try {
+                const res = await fetch(`{% url 'redact_text_inspect' %}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRF(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: formData,
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to load suggestions.');
+                }
+                redactSuggested = data.terms || [];
+                messageEl.textContent = '';
+                messageEl.classList.remove('info');
+                renderRedactSuggestions();
+            } catch (err) {
+                redactSuggested = [];
+                renderRedactSuggestions();
+                messageEl.textContent = err.message || 'Unable to load suggestions.';
+                messageEl.classList.remove('info');
+                messageEl.classList.add('warning');
+            }
+        }
+
+        function handleRedact() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!redactInput || !redactInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!redactTerms.length) {
+                messageEl.textContent = 'Add at least one term to redact.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (redactDownloadWrap && redactDownloadLink) {
+                redactDownloadWrap.hidden = true;
+                redactDownloadLink.removeAttribute('href');
+                redactDownloadLink.classList.add('disabled');
+                redactDownloadLink.setAttribute('aria-disabled', 'true');
+                redactDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            formData.append('pdf', redactInput.files[0]);
+            formData.append('terms', redactTerms.join(','));
+
+            messageEl.textContent = 'Redacting text...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'redact_text' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to redact text.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'Text redacted.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && redactDownloadLink && redactDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    redactDownloadLink.href = url;
+                    redactDownloadLink.download = data.file_name || 'redacted.pdf';
+                    redactDownloadLink.classList.remove('disabled');
+                    redactDownloadLink.removeAttribute('aria-disabled');
+                    redactDownloadLink.classList.add('highlight');
+                    redactDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to redact text.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (redactDownloadWrap && redactDownloadLink) {
+                    redactDownloadWrap.hidden = true;
+                    redactDownloadLink.removeAttribute('href');
+                    redactDownloadLink.classList.add('disabled');
+                    redactDownloadLink.setAttribute('aria-disabled', 'true');
+                    redactDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+        if (mergeInput) {
+            mergeInput.addEventListener('change', handleMergeInputChange);
+        }
+        if (mergeDownloadLink) {
+            mergeDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                mergeDownloadLink.classList.remove('highlight');
+            });
+        }
+        if (splitInput) {
+            splitInput.addEventListener('change', () => {
+                splitFile = splitInput.files && splitInput.files[0] ? splitInput.files[0] : null;
+                if (splitFile) {
+                    if (splitDropText) splitDropText.textContent = splitFile.name;
+                    if (splitDrop) splitDrop.classList.add('has-file');
+                } else {
+                    if (splitDropText) splitDropText.textContent = defaultDropText;
+                    if (splitDrop) splitDrop.classList.remove('has-file');
+                }
+            });
+        }
+        if (splitDownloadLink) {
+            splitDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                splitDownloadLink.classList.remove('highlight');
+            });
+        }
+        if (toImageInput) {
+            toImageInput.addEventListener('change', () => {
+                toImageFile = toImageInput.files && toImageInput.files[0] ? toImageInput.files[0] : null;
+                if (toImageFile) {
+                    if (toImageDropText) toImageDropText.textContent = toImageFile.name;
+                    if (toImageDrop) toImageDrop.classList.add('has-file');
+                } else {
+                    if (toImageDropText) toImageDropText.textContent = defaultDropText;
+                    if (toImageDrop) toImageDrop.classList.remove('has-file');
+                }
+            });
+        }
+        if (toImageDownloadLink) {
+            toImageDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                toImageDownloadLink.classList.remove('highlight');
+            });
+        }
+        if (imageToPdfInput) {
+            imageToPdfInput.addEventListener('change', () => {
+                imageToPdfFiles = imageToPdfInput.files ? Array.from(imageToPdfInput.files) : [];
+                if (imageToPdfFiles.length) {
+                    const names = imageToPdfFiles.map(f => f.name).join(', ');
+                    if (imageToPdfDropText) imageToPdfDropText.textContent = names;
+                    if (imageToPdfDrop) imageToPdfDrop.classList.add('has-file');
+                } else {
+                    if (imageToPdfDropText) imageToPdfDropText.textContent = 'Drop images or click to upload';
+                    if (imageToPdfDrop) imageToPdfDrop.classList.remove('has-file');
+                }
+            });
+        }
+        if (removeInput) {
+            removeInput.addEventListener('change', () => {
+                removeFile = removeInput.files && removeInput.files[0] ? removeInput.files[0] : null;
+                if (removeFile) {
+                    if (removeDropText) removeDropText.textContent = removeFile.name;
+                    if (removeDrop) removeDrop.classList.add('has-file');
+                    // fetch page count to build checklist
+                    const formData = new FormData();
+                    formData.append('pdf', removeInput.files[0]);
+                    messageEl.textContent = 'Loading pages...';
+                    fetch(`{% url 'remove_pages_inspect' %}`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCSRF(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: formData,
+                    }).then(async (res) => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            throw new Error(data.message || 'Unable to read pages.');
+                        }
+                        removeTotalPages = data.pages || 0;
+                        removeSelected = new Set();
+                        removePreviews = data.previews || [];
+                        renderRemovePagesList();
+                        messageEl.textContent = '';
+                    }).catch(err => {
+                        messageEl.textContent = err.message || 'Unable to read pages.';
+                        removeTotalPages = 0;
+                        removeSelected = new Set();
+                        removePreviews = [];
+                        if (removePagesList) {
+                            removePagesList.innerHTML = '<div class="merge-empty">No pages loaded yet.</div>';
+                        }
+                    });
+                } else {
+                    if (removeDropText) removeDropText.textContent = defaultDropText;
+                    if (removeDrop) removeDrop.classList.remove('has-file');
+                    removeTotalPages = 0;
+                    removeSelected = new Set();
+                    removePreviews = [];
+                    if (removePagesList) {
+                        removePagesList.innerHTML = '<div class="merge-empty">No pages loaded yet.</div>';
+                    }
+                }
+            });
+        }
+        if (redactInput) {
+            redactInput.addEventListener('change', () => {
+                redactFile = redactInput.files && redactInput.files[0] ? redactInput.files[0] : null;
+                if (redactFile) {
+                    if (redactDropText) redactDropText.textContent = redactFile.name;
+                    if (redactDrop) redactDrop.classList.add('has-file');
+                    redactTerms = [];
+                    renderRedactTerms();
+                    redactSearchTerm = '';
+                    if (redactSearchInput) redactSearchInput.value = '';
+                    fetchRedactSuggestions(redactFile);
+                } else {
+                    if (redactDropText) redactDropText.textContent = defaultDropText;
+                    if (redactDrop) redactDrop.classList.remove('has-file');
+                    redactTerms = [];
+                    renderRedactTerms();
+                    redactSearchTerm = '';
+                    if (redactSearchInput) redactSearchInput.value = '';
+                    redactSuggested = [];
+                    renderRedactSuggestions();
+                }
+            });
+        }
+        if (redactSearchInput) {
+            redactSearchInput.addEventListener('input', (e) => {
+                redactSearchTerm = e.target.value || '';
+                renderRedactSuggestions();
+            });
+        }
+        if (redactDownloadLink) {
+            redactDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                redactDownloadLink.classList.remove('highlight');
+            });
+        }
+        if (imageToPdfDownloadLink) {
+            imageToPdfDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                imageToPdfDownloadLink.classList.remove('highlight');
+            });
+        }
+        if (removeFields) {
+            const selectAllBtn = document.querySelector('[data-remove-select-all]');
+            const clearBtn = document.querySelector('[data-remove-clear]');
+            if (selectAllBtn) {
+                selectAllBtn.addEventListener('click', () => {
+                    if (!removeTotalPages) return;
+                    removeSelected = new Set(Array.from({ length: removeTotalPages }, (_, i) => i));
+                    renderRemovePagesList();
+                });
+            }
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    removeSelected = new Set();
+                    renderRemovePagesList();
+                });
+            }
+        }
+
+        function renderRemovePagesList() {
+            if (!removePagesList) return;
+            if (!removeTotalPages) {
+                removePagesList.innerHTML = '<div class="merge-empty">No pages loaded yet.</div>';
+                return;
+            }
+            let html = '';
+            for (let i = 1; i <= removeTotalPages; i++) {
+                const idx = i - 1;
+                const checked = removeSelected.has(idx) ? 'checked' : '';
+                const preview = removePreviews[idx] ? `<div class="page-preview"><img src="data:image/png;base64,${removePreviews[idx]}" alt="Page ${i} preview"></div>` : '';
+                html += `<label class="page-chip"><input type="checkbox" data-remove-page="${idx}" ${checked}>Page ${i}${preview}</label>`;
+            }
+            removePagesList.innerHTML = html;
+            removePagesList.querySelectorAll('[data-remove-page]').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const idx = parseInt(e.target.dataset.removePage, 10);
+                    if (e.target.checked) removeSelected.add(idx);
+                    else removeSelected.delete(idx);
+                });
+            });
+        }
+        if (removeDownloadLink) {
+            removeDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                removeDownloadLink.classList.remove('highlight');
+            });
+        }
+        if (redactDownloadLink) {
+            redactDownloadLink.addEventListener('click', () => {
+                downloaded = true;
+                downloadReady = false;
+                redactDownloadLink.classList.remove('highlight');
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Reset password{% endblock %}
+
+{% block content %}
+<section class="section auth">
+    <div class="auth-card">
+        <h1>Reset password</h1>
+        {% if error %}
+        <div class="form-errors">{{ error }}</div>
+        {% endif %}
+        {% if not error %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="token" value="{{ token }}">
+            <label>New password</label>
+            <input type="password" name="password" required>
+            <label>Confirm password</label>
+            <input type="password" name="confirm" required>
+            <button class="btn primary wide" type="submit">Update password</button>
+        </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

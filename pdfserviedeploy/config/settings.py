@@ -28,20 +28,12 @@ load_dotenv(BASE_DIR / ".venv" / ".env")
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "django-insecure-$8(-a(-=hau!b$4#ck^wr+09)pen)z#qpie_ekkhhd7#&4gpt5"
-)
+SECRET_KEY = 'django-insecure-$8(-a(-=hau!b$4#ck^wr+09)pen)z#qpie_ekkhhd7#&4gpt5'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
+DEBUG = True
 
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.environ.get(
-        "ALLOWED_HOSTS", "pdfservice.plughub-ims.com,localhost,127.0.0.1"
-    ).split(",")
-    if h.strip()
-]
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -156,11 +148,5 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True  # best-effort header for legacy browsers
 SECURE_SSL_REDIRECT = False if DEBUG else True
 SECURE_REFERRER_POLICY = "same-origin"
-
-CSRF_TRUSTED_ORIGINS = [
-    f"https://{h}" if not h.startswith("http") else h
-    for h in ALLOWED_HOSTS
-    if h not in ("localhost", "127.0.0.1")
-]
 
 PDFSERVICE_API_KEY = os.environ.get("PDFSERVICE_API_KEY", "changeme")

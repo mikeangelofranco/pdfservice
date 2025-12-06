@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Page not found{% endblock %}
+
+{% block content %}
+<section class="section hero">
+    <div class="hero-content">
+        <div class="pill small">404</div>
+        <h1>Looks like we pulled a blank page.</h1>
+        <p class="muted">The link you followed doesn’t exist. Let’s get you back to your PDFs.</p>
+        <div class="hero-actions">
+            <a class="btn primary" href="{% url 'dashboard' %}">Go to dashboard</a>
+            <a class="btn ghost" href="{% url 'home' %}">Back to home</a>
+        </div>
+    </div>
+    <div class="hero-visual">
+        <div class="floating-card">
+            <img src="{% static 'img/logo.png' %}" alt="PlugHub" class="brand-logo" style="width: 64px; height: 64px;">
+            <div class="floating-text">No PDF found</div>
+            <div class="floating-subtext">Check the address or use the buttons to navigate.</div>
+        </div>
+    </div>
+</section>
+{% endblock %}

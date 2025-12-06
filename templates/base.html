@@ -24,6 +24,11 @@
         <nav class="nav-links">
             <a href="{% url 'home' %}">Home</a>
             <a href="{% url 'dashboard' %}">Dashboard</a>
+            <a href="{% url 'payment' %}">Top up</a>
+            {% if user.is_superuser %}
+            <a href="{% url 'user_list' %}">Users</a>
+            <a href="{% url 'admin_reset_link' %}">Reset links</a>
+            {% endif %}
             {% if user.is_authenticated %}
                 <a class="pill" href="{% url 'logout' %}">Logout</a>
             {% else %}

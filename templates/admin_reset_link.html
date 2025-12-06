@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Generate reset link{% endblock %}
+
+{% block content %}
+<section class="section dashboard">
+    <div class="section-head">
+        <h1>Generate reset link</h1>
+        <p>Enter a user email to create a password reset link.</p>
+    </div>
+    <form method="post" class="search-row">
+        {% csrf_token %}
+        <input type="email" name="email" placeholder="user@example.com" required>
+        <button class="btn primary" type="submit">Generate</button>
+    </form>
+    {% if error %}
+    <div class="form-errors">{{ error }}</div>
+    {% endif %}
+    {% if link %}
+    <div class="topup-table-wrap" style="margin-top:12px;">
+        <div class="topup-table-header">Reset link</div>
+        <div class="topup-hint"><code>{{ link }}</code></div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

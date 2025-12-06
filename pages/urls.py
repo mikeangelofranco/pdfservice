@@ -6,6 +6,11 @@ from . import views
 urlpatterns = [
     path('', views.home, name='home'),
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('payment/', views.payment, name='payment'),
+    path('users/', views.user_list, name='user_list'),
+    path('reset-link/', views.admin_reset_link, name='admin_reset_link'),
+    path('reset/', views.reset_via_link, name='reset_via_link'),
+    path('forgot-password/', views.forgot_password, name='forgot_password'),
     path('signup/', views.signup, name='signup'),
     path('tool/<slug:slug>/', views.use_tool, name='use_tool'),
     path('tool/pdf-lock/process/', views.pdf_lock, name='pdf_lock'),

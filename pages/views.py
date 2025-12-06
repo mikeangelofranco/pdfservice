@@ -7,8 +7,12 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
+from django.core.paginator import Paginator
+from django.contrib.auth import get_user_model
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.urls import reverse
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -33,7 +37,6 @@ def home(request):
     services = [
         "PDF Merge",
         "PDF Split",
-        "PDF Compress",
         "PDF Unlock",
         "PDF to Image",
         "Image to PDF",
@@ -93,6 +96,162 @@ def dashboard(request):
             "tools": tools,
             "credit_balance": balance,
         },
+    )
+
+
+@login_required
+def payment(request):
+    plans = [
+        {"amount": 99, "credits": 6},
+        {"amount": 200, "credits": 13},
+        {"amount": 400, "credits": 29},
+        {"amount": 800, "credits": 64},
+        {"amount": 1600, "credits": 140},
+    ]
+    return render(
+        request,
+        "payment.html",
+        {
+            "plans": plans,
+            "credit_balance": _available_credits(request.user),
+        },
+    )
+
+
+@login_required
+def user_list(request):
+    if not request.user.is_superuser:
+        return redirect("dashboard")
+
+    query = (request.GET.get("q") or "").strip()
+    users = User.objects.all().order_by("email").prefetch_related("purchases")
+    if query:
+        users = users.filter(
+            Q(email__icontains=query)
+            | Q(username__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(purchases__description__icontains=query)
+        ).distinct()
+
+    paginator = Paginator(users, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    rows = []
+    for u in page_obj:
+        available = _available_credits(u)
+        last_payment_obj = u.purchases.filter(status="completed").order_by("-created_at").first()
+        last_payment = last_payment_obj.created_at if last_payment_obj else None
+        payments_meta = [
+            {"date": p.created_at, "amount": p.amount, "status": p.status}
+            for p in u.purchases.all().order_by("-created_at")
+        ]
+        rows.append(
+            {
+                "user": u,
+                "available": available,
+                "last_payment": last_payment,
+                "payments": payments_meta,
+            }
+        )
+
+    return render(
+        request,
+        "users.html",
+        {
+            "page_obj": page_obj,
+            "rows": rows,
+            "query": query,
+            "credit_balance": _available_credits(request.user),
+        },
+    )
+
+
+@login_required
+def admin_reset_link(request):
+    if not request.user.is_superuser:
+        return redirect("dashboard")
+
+    link = None
+    error = None
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip().lower()
+        try:
+            target = User.objects.get(email=email)
+            token = signer.sign(target.email)
+            link = request.build_absolute_uri(f"{reverse('reset_via_link')}?token={token}")
+        except User.DoesNotExist:
+            error = "User not found."
+
+    return render(
+        request,
+        "admin_reset_link.html",
+        {"link": link, "error": error, "credit_balance": _available_credits(request.user)},
+    )
+
+
+def reset_via_link(request):
+    token = request.GET.get("token") or request.POST.get("token")
+    email = None
+    error = None
+    if token:
+        try:
+            email = signer.unsign(token, max_age=60 * 60 * 24)
+        except SignatureExpired:
+            error = "Reset link has expired."
+        except BadSignature:
+            error = "Invalid reset link."
+    else:
+        error = "Missing reset link."
+
+    if request.method == "POST" and not error and email:
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            error = "User not found."
+        password = request.POST.get("password") or ""
+        confirm = request.POST.get("confirm") or ""
+        if not error:
+            if not password:
+                error = "Password is required."
+            elif password != confirm:
+                error = "Passwords do not match."
+            elif len(password) < 8:
+                error = "Password must be at least 8 characters."
+            else:
+                user.set_password(password)
+                user.save()
+                messages.success(request, "Password updated. You can now log in.")
+                return redirect("login")
+
+    return render(
+        request,
+        "reset_via_link.html",
+        {"token": token, "email": email, "error": error},
+    )
+
+
+def forgot_password(request):
+    message = None
+    error = None
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip().lower()
+        dob = (request.POST.get("dob") or "").strip()
+        try:
+            User.objects.get(email=email)
+            message = (
+                "We found your account. Please email paymentsupport@plughub-ims.com "
+                "with your email and birthdate for verification. Include the birthdate you entered: "
+                f"{dob if dob else 'not provided'}."
+            )
+        except User.DoesNotExist:
+            error = "Invalid email address. Please consider signing up instead."
+
+    return render(
+        request,
+        "forgot_password.html",
+        {"message": message, "error": error},
     )
 
 
@@ -754,3 +913,5 @@ def increase_credits(request):
             "balance": remaining,
         }
     )
+User = get_user_model()
+signer = TimestampSigner()

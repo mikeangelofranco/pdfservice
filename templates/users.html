@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Users - PlugHub{% endblock %}
+
+{% block content %}
+<section class="section dashboard">
+    <div class="section-head">
+        <h1>Users</h1>
+        <p>Manage credits and activity. Search any field and browse with pagination.</p>
+    </div>
+
+    <form class="search-row" method="get">
+        <input type="text" name="q" placeholder="Search email, name, payments..." value="{{ query }}" />
+        <button class="btn primary" type="submit">Search</button>
+    </form>
+
+    <div class="topup-table-wrap">
+        <div class="topup-table-header">User list</div>
+        <table class="topup-table">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Available credits</th>
+                    <th>Last login</th>
+                    <th>Last payment</th>
+                    <th>Payments</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.user.email }}</td>
+                    <td>{{ row.available }}</td>
+                    <td>
+                        {% if row.user.last_login %}
+                            {{ row.user.last_login|date:"M d, Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.last_payment %}
+                            {{ row.last_payment|date:"M d, Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.payments %}
+                            <div class="meta-list">
+                                {% for p in row.payments %}
+                                    <div class="meta-item">{{ p.date|date:"M d, Y H:i" }} — ₱{{ p.amount }} ({{ p.status }})</div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&q={{ query }}">Previous</a>
+            {% else %}
+                <span class="disabled">Previous</span>
+            {% endif %}
+
+            <span class="page-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&q={{ query }}">Next</a>
+            {% else %}
+                <span class="disabled">Next</span>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -16,7 +16,13 @@
             <span class="credit-glow"></span>
         </div>
         <div class="credit-label">Credits available</div>
-        <div class="credit-value">{{ credit_balance }}</div>
+        <div class="credit-row">
+            <div class="credit-value">{{ credit_balance }}</div>
+            <div class="topup-wrap" {% if credit_balance > 1 %}hidden{% endif %}>
+                <button type="button" class="topup-btn" data-topup-btn>Top up</button>
+                <div class="topup-tooltip" data-topup-tip>Low credits — top up to keep working seamlessly.</div>
+            </div>
+        </div>
         <p class="credit-note">1 credit per tool launch. Credits are tied to your purchases.</p>
     </div>
 
@@ -63,7 +69,12 @@
                 <div class="pill small" data-modal-pill></div>
                 <h3 data-modal-title></h3>
                 <div class="modal-meta">
-                    <span class="chip credit-chip">Credits: <span data-modal-balance>{{ credit_balance }}</span></span>
+                    <div class="modal-credit-wrap">
+                        <span class="chip credit-chip">Credits: <span data-modal-balance>{{ credit_balance }}</span></span>
+                        <div class="topup-wrap modal" {% if credit_balance > 1 %}hidden{% endif %}>
+                            <button type="button" class="topup-btn small" data-modal-topup-btn>Top up</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <button class="close-btn" type="button" data-modal-close aria-label="Close modal">✕</button>
@@ -209,6 +220,9 @@
         const messageEl = document.querySelector('[data-modal-message]');
         const warningEl = document.querySelector('[data-credit-warning]');
         const modalBalanceEl = document.querySelector('[data-modal-balance]');
+        const topupBtn = document.querySelector('[data-topup-btn]');
+        const modalTopupBtn = document.querySelector('[data-modal-topup-btn]');
+        const paymentUrl = "{% url 'payment' %}";
         const lockFields = document.querySelector('[data-lock-fields]');
         const fileDrop = document.querySelector('[data-file-drop]');
         const pdfInput = document.querySelector('[data-lock-file]');
@@ -285,6 +299,39 @@
             return match ? match[1] : '';
         }
 
+        function goToPayment() {
+            window.location.href = paymentUrl;
+        }
+
+        if (topupBtn) {
+            topupBtn.addEventListener('click', goToPayment);
+        }
+        if (modalTopupBtn) {
+            modalTopupBtn.addEventListener('click', goToPayment);
+        }
+
+        function updateCreditsUI(credits) {
+            currentCredits = credits;
+            document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = credits);
+            const creditValue = document.querySelector('.credit-value');
+            if (creditValue) creditValue.textContent = credits;
+            if (modalBalanceEl) modalBalanceEl.textContent = credits;
+            if (topupBtn) {
+                const wrap = topupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(credits <= 1);
+                topupBtn.hidden = !(credits <= 1);
+            }
+            if (modalTopupBtn) {
+                const wrap = modalTopupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(credits <= 1);
+                modalTopupBtn.hidden = !(credits <= 1);
+            }
+            if (warningEl) {
+                warningEl.hidden = credits > 1;
+                warningEl.textContent = `Low credits. You have ${credits} remaining. One credit is deducted when you launch.`;
+            }
+        }
+
         function openModal(btn) {
             currentSlug = btn.dataset.slug;
             const name = btn.dataset.name;
@@ -307,6 +354,16 @@
             warningEl.hidden = creditsLeft > 1;
             warningEl.textContent = `Low credits. You have ${creditsLeft} remaining. One credit is deducted when you launch.`;
             if (modalBalanceEl) modalBalanceEl.textContent = creditsLeft;
+            if (topupBtn) {
+                const wrap = topupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(creditsLeft <= 1);
+                topupBtn.hidden = !(creditsLeft <= 1);
+            }
+            if (modalTopupBtn) {
+                const wrap = modalTopupBtn.closest('.topup-wrap');
+                if (wrap) wrap.hidden = !(creditsLeft <= 1);
+                modalTopupBtn.hidden = !(creditsLeft <= 1);
+            }
             if (lockFields) {
                 lockFields.hidden = !(isLock || isUnlock);
                 lockFields.style.display = (isLock || isUnlock) ? 'grid' : 'none';
@@ -559,14 +616,8 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to launch service.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'Queued.';
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
             }).catch(err => {
                messageEl.textContent = err.message || 'Unable to launch service.';
            });
@@ -625,13 +676,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to lock PDF.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'PDF locked.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -715,13 +760,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to unlock PDF.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'PDF unlocked.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -847,13 +886,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to merge PDFs.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'PDFs merged.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -930,13 +963,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to split PDF.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'PDF split.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -1039,13 +1066,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to convert PDF to images.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'PDF converted.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -1122,13 +1143,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to convert images to PDF.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'Images converted.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -1221,13 +1236,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to remove pages.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'Pages removed.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;
@@ -1409,13 +1418,7 @@
                 if (!res.ok) {
                     throw new Error(data.message || 'Unable to redact text.');
                 }
-                currentCredits = data.remaining;
-                document.querySelectorAll('[data-credits]').forEach(el => el.dataset.credits = currentCredits);
-                const creditValue = document.querySelector('.credit-value');
-                if (creditValue) creditValue.textContent = currentCredits;
-                if (modalBalanceEl) modalBalanceEl.textContent = currentCredits;
-                warningEl.hidden = currentCredits > 1;
-                warningEl.textContent = `Low credits. You have ${currentCredits} remaining. One credit is deducted when you launch.`;
+                updateCreditsUI(data.remaining);
                 messageEl.textContent = data.message || 'Text redacted.';
                 messageEl.classList.remove('error', 'warning');
                 downloadReady = true;

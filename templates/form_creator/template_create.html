@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}New Template - PDF Form Creator{% endblock %}
+
+{% block content %}
+<section class="section form-creator-page">
+    <div class="section-head">
+        <div class="form-creator-head">
+            <div>
+                <span class="advanced-tag">ADVANCED</span>
+                <h1>Create Template</h1>
+                <p>Start a new PDF form template with the basics.</p>
+            </div>
+            <div class="form-creator-actions">
+                <a class="btn ghost" href="{% url 'form_creator' %}">Back to list</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card form-create-card">
+        <form method="post" action="{% url 'form_creator_new' %}" class="form-grid">
+            {% csrf_token %}
+            <div class="field-stack">
+                <label class="field-label" for="template-name">Template name</label>
+                <input id="template-name" name="name" type="text" placeholder="e.g. Client intake form" required>
+            </div>
+            <div class="field-stack">
+                <label class="field-label" for="template-size">Page size</label>
+                <select id="template-size" name="page_size">
+                    <option value="A4">A4</option>
+                    <option value="LETTER">Letter</option>
+                </select>
+            </div>
+            <div class="field-stack">
+                <label class="field-label" for="template-output">Default output</label>
+                <select id="template-output" name="default_output_mode">
+                    <option value="FLATTENED">Flattened</option>
+                    <option value="FILLABLE">Fillable</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button class="btn primary" type="submit">Create and open builder</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Access Required - PlugHub{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="section-head">
+        <h1>PDF Form Creator</h1>
+        <p>Advanced access required to launch this tool.</p>
+    </div>
+
+    <div class="card access-card">
+        <h3>Access restricted</h3>
+        <p>{{ reason }}</p>
+        <div class="cta-row">
+            <a class="btn secondary" href="{% url 'payment' %}">Top up</a>
+            <a class="btn ghost" href="mailto:paymentsupport@plughub-ims.com">Contact admin</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,1665 @@
+{% extends "base.html" %}
+
+{% block title %}Template Builder - PDF Form Creator{% endblock %}
+
+{% block content %}
+<section class="section form-creator-builder" data-template-id="{{ template.id }}" data-save-url="{% url 'form_creator_save' template.id %}" data-export-url="{% url 'form_creator_export' template.id %}">
+    <div class="section-head">
+        <div class="form-creator-head">
+            <div>
+                <span class="advanced-tag">ADVANCED</span>
+                <h1>Template Builder</h1>
+                <p>Drag fields onto the canvas, fine-tune properties, and export.</p>
+            </div>
+            <div class="form-creator-actions">
+                <a class="btn ghost" href="{% url 'form_creator' %}">Back to list</a>
+                <button class="btn ghost" type="button" data-save-template>Save</button>
+                <button class="btn primary" type="button" data-export-template>Export PDF</button>
+            </div>
+        </div>
+        <div class="save-indicator" data-save-indicator>Saved</div>
+    </div>
+
+    <div class="message-stack" data-message-stack hidden></div>
+
+    <div class="fc-tabs" data-fc-tabs>
+        <button class="fc-tab" type="button" data-tab="controls">Controls</button>
+        <button class="fc-tab active" type="button" data-tab="canvas">Canvas</button>
+    </div>
+
+    <div class="fc-layout" data-fc-layout data-active-panel="canvas">
+        <aside class="card fc-panel fc-panel--controls" data-panel="controls">
+            <div class="panel-head">
+                <h3>Controls</h3>
+                <p>Manage fields, properties, and template settings.</p>
+            </div>
+
+            <details class="fc-collapsible" open>
+                <summary>Properties</summary>
+                <div class="fc-collapsible-body">
+                    <div class="properties-group" data-field-properties hidden>
+                        <div class="properties-row">
+                            <h4 data-selected-title>Selected field</h4>
+                            <div class="field-actions">
+                                <button class="btn ghost small" type="button" data-duplicate-field>Duplicate field</button>
+                                <button class="btn ghost small danger" type="button" data-delete-field>Delete field</button>
+                            </div>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label" for="fc-field-label" data-field-label-title>Label</label>
+                            <input id="fc-field-label" type="text" data-field-label>
+                            <textarea id="fc-field-label-text" rows="3" data-field-label-text hidden></textarea>
+                            <p class="field-help" data-field-label-help hidden>Use this to enter the paragraph text. Line breaks are preserved.</p>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label" for="fc-field-key">Key</label>
+                            <input id="fc-field-key" type="text" data-field-key>
+                        </div>
+                        <label class="checkbox-row" data-prop-required>
+                            <input type="checkbox" data-field-required>
+                            Required field
+                        </label>
+                        <div class="field-stack" data-prop-placeholder>
+                            <label class="field-label" for="fc-field-placeholder">Placeholder</label>
+                            <input id="fc-field-placeholder" type="text" data-field-placeholder>
+                        </div>
+                        <div class="field-stack" data-prop-default>
+                            <label class="field-label" for="fc-field-default">Default value</label>
+                            <input id="fc-field-default" type="text" data-field-default>
+                        </div>
+                        <div class="field-stack" data-prop-font-size>
+                            <label class="field-label" for="fc-field-font-size">Font size (pt)</label>
+                            <input id="fc-field-font-size" type="number" min="6" max="48" step="1" data-field-font-size>
+                        </div>
+                        <div class="field-stack" data-prop-options>
+                            <label class="field-label" for="fc-field-options">Options (one per line)</label>
+                            <textarea id="fc-field-options" rows="4" data-field-options></textarea>
+                        </div>
+                        <div class="field-stack" data-prop-validation>
+                            <label class="field-label">Validation</label>
+                            <div class="field-inline">
+                                <input type="text" placeholder="Min" data-field-min>
+                                <input type="text" placeholder="Max" data-field-max>
+                            </div>
+                        </div>
+                        <div class="field-stack" data-prop-divider>
+                            <label class="checkbox-row">
+                                <input type="checkbox" data-field-divider>
+                                Show divider line
+                            </label>
+                        </div>
+                        <div class="properties-group" data-table-properties hidden>
+                            <div class="properties-row">
+                                <h4>Table settings</h4>
+                            </div>
+                            <div class="field-stack">
+                                <label class="field-label" for="fc-table-columns">Columns</label>
+                                <input id="fc-table-columns" type="number" min="1" max="12" step="1" data-table-columns disabled>
+                            </div>
+                            <div class="field-stack">
+                                <label class="field-label" for="fc-table-headers">Column headers (one per line)</label>
+                                <textarea id="fc-table-headers" rows="4" data-table-headers></textarea>
+                            </div>
+                            <div class="field-stack">
+                                <label class="field-label" for="fc-table-rows">Rows</label>
+                                <input id="fc-table-rows" type="number" min="1" max="50" step="1" data-table-rows>
+                            </div>
+                            <label class="checkbox-row">
+                                <input type="checkbox" data-table-include-header>
+                                Include header row
+                            </label>
+                            <div class="field-inline">
+                                <button class="btn ghost small" type="button" data-table-add-row>Add row</button>
+                                <button class="btn ghost small" type="button" data-table-remove-row>Remove last row</button>
+                            </div>
+                            <div class="field-stack">
+                                <label class="field-label" for="fc-table-cell-padding">Cell padding</label>
+                                <input id="fc-table-cell-padding" type="number" min="0" max="24" step="1" data-table-cell-padding>
+                            </div>
+                            <div class="field-stack">
+                                <label class="field-label" for="fc-table-font-size">Font size</label>
+                                <input id="fc-table-font-size" type="number" min="6" max="24" step="1" data-table-font-size>
+                            </div>
+                            <div class="field-stack">
+                                <label class="field-label" for="fc-table-border-width">Border width</label>
+                                <input id="fc-table-border-width" type="number" min="1" max="6" step="1" data-table-border-width>
+                            </div>
+                            <label class="checkbox-row">
+                                <input type="checkbox" data-table-header-background>
+                                Header background
+                            </label>
+                            <label class="checkbox-row">
+                                <input type="checkbox" data-table-header-bold>
+                                Header bold
+                            </label>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label">Position and size (%)</label>
+                            <div class="field-inline">
+                                <input type="number" min="0" max="100" step="0.1" placeholder="X" data-field-x>
+                                <input type="number" min="0" max="100" step="0.1" placeholder="Y" data-field-y>
+                                <input type="number" min="0" max="100" step="0.1" placeholder="W" data-field-w>
+                                <input type="number" min="0" max="100" step="0.1" placeholder="H" data-field-h>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="properties-empty" data-properties-empty>
+                        Select a field on the canvas to edit its settings.
+                    </div>
+                </div>
+            </details>
+
+            <details class="fc-collapsible" open>
+                <summary>Field Palette</summary>
+                <div class="fc-collapsible-body">
+                    <p class="fc-group-note">Drag or click to place fields on the page.</p>
+                    <div class="palette-grid" data-palette-grid>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="text">Text</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="multiline">Multiline text</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="number">Number</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="date">Date</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="dropdown">Dropdown</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="checkbox">Checkbox</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="radio">Radio group</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="table" title="Add a structured table grid to the PDF.">Table</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="signature">Signature</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="heading">Heading</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="paragraph">Paragraph</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="section">Section header</button>
+                    </div>
+                    <div class="palette-actions">
+                        <div class="field-stack">
+                            <label class="field-label" for="fc-add-type">Quick add</label>
+                            <select id="fc-add-type" data-add-type>
+                                <option value="text">Text</option>
+                                <option value="multiline">Multiline text</option>
+                                <option value="number">Number</option>
+                                <option value="date">Date</option>
+                                <option value="dropdown">Dropdown</option>
+                                <option value="checkbox">Checkbox</option>
+                                <option value="radio">Radio group</option>
+                                <option value="table">Table</option>
+                                <option value="signature">Signature</option>
+                                <option value="heading">Heading</option>
+                                <option value="paragraph">Paragraph</option>
+                                <option value="section">Section header</option>
+                            </select>
+                        </div>
+                        <button class="btn secondary small" type="button" data-add-field>Click to place</button>
+                    </div>
+                    <div class="palette-hint" data-placement-hint hidden>Click on the canvas to place the field.</div>
+                </div>
+            </details>
+
+            <details class="fc-collapsible" open>
+                <summary>Template Settings</summary>
+                <div class="fc-collapsible-body">
+                    <div class="properties-group">
+                        <div class="field-stack">
+                            <label class="field-label" for="fc-template-name">Template name</label>
+                            <input id="fc-template-name" type="text" data-template-name>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label" for="fc-output-mode">Default output</label>
+                            <select id="fc-output-mode" data-template-output>
+                                <option value="FLATTENED">Flattened</option>
+                                <option value="FILLABLE">Fillable</option>
+                            </select>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label">Margins (pt)</label>
+                            <div class="field-inline">
+                                <input type="number" min="0" step="1" placeholder="Top" data-margin-top>
+                                <input type="number" min="0" step="1" placeholder="Right" data-margin-right>
+                                <input type="number" min="0" step="1" placeholder="Bottom" data-margin-bottom>
+                                <input type="number" min="0" step="1" placeholder="Left" data-margin-left>
+                            </div>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label" for="fc-page-size">Page size</label>
+                            <select id="fc-page-size" data-page-size>
+                                <option value="A4">A4</option>
+                                <option value="LETTER">Letter</option>
+                            </select>
+                        </div>
+                        <div class="field-stack">
+                            <label class="field-label">Zoom</label>
+                            <div class="zoom-controls">
+                                <button class="btn ghost small" type="button" data-zoom="0.5">50%</button>
+                                <button class="btn ghost small" type="button" data-zoom="0.75">75%</button>
+                                <button class="btn ghost small active" type="button" data-zoom="1">100%</button>
+                                <button class="btn ghost small" type="button" data-zoom="1.25">125%</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </aside>
+
+        <section class="card fc-panel fc-panel--canvas" data-panel="canvas">
+            <div class="canvas-shell">
+                <div class="canvas-page" data-canvas-page>
+                    <div class="canvas-margins" data-canvas-margins></div>
+                    <div class="canvas-layer" data-canvas-layer></div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+    <div class="modal-backdrop" data-table-modal hidden>
+        <div class="modal">
+            <div class="modal-head">
+                <div>
+                    <h3>Create table</h3>
+                    <p class="modal-description">Set the number of columns and rows for your table.</p>
+                </div>
+                <button class="close-btn" type="button" data-table-modal-cancel aria-label="Close modal">x</button>
+            </div>
+            <div class="form-grid">
+                <div class="field-stack">
+                    <label class="field-label" for="fc-table-modal-columns">Number of columns</label>
+                    <input id="fc-table-modal-columns" type="number" min="1" max="12" step="1" data-table-modal-columns>
+                </div>
+                <div class="field-stack">
+                    <label class="field-label" for="fc-table-modal-rows">Number of rows</label>
+                    <input id="fc-table-modal-rows" type="number" min="1" max="50" step="1" data-table-modal-rows>
+                </div>
+                <label class="checkbox-row">
+                    <input type="checkbox" data-table-modal-header>
+                    Include header row
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn ghost" type="button" data-table-modal-cancel>Cancel</button>
+                <button class="btn primary" type="button" data-table-modal-apply>Apply</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{ template_data|json_script:"template-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const wrapper = document.querySelector('.form-creator-builder');
+        if (!wrapper) return;
+
+        const templateData = JSON.parse(document.getElementById('template-data').textContent || '{}');
+        const saveUrl = wrapper.dataset.saveUrl;
+        const exportUrl = wrapper.dataset.exportUrl;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        const tabs = wrapper.querySelectorAll('[data-tab]');
+        const layout = wrapper.querySelector('[data-fc-layout]');
+        const messageStack = wrapper.querySelector('[data-message-stack]');
+        const saveIndicator = wrapper.querySelector('[data-save-indicator]');
+        const pageSizeSelect = wrapper.querySelector('[data-page-size]');
+        const canvasPage = wrapper.querySelector('[data-canvas-page]');
+        const canvasLayer = wrapper.querySelector('[data-canvas-layer]');
+        const canvasMargins = wrapper.querySelector('[data-canvas-margins]');
+        const paletteGrid = wrapper.querySelector('[data-palette-grid]');
+        const addFieldBtn = wrapper.querySelector('[data-add-field]');
+        const addTypeSelect = wrapper.querySelector('[data-add-type]');
+        const placementHint = wrapper.querySelector('[data-placement-hint]');
+
+        const templateNameInput = wrapper.querySelector('[data-template-name]');
+        const templateOutputSelect = wrapper.querySelector('[data-template-output]');
+        const marginTopInput = wrapper.querySelector('[data-margin-top]');
+        const marginRightInput = wrapper.querySelector('[data-margin-right]');
+        const marginBottomInput = wrapper.querySelector('[data-margin-bottom]');
+        const marginLeftInput = wrapper.querySelector('[data-margin-left]');
+
+        const propertiesPanel = wrapper.querySelector('[data-field-properties]');
+        const propertiesEmpty = wrapper.querySelector('[data-properties-empty]');
+        const fieldLabelInput = wrapper.querySelector('[data-field-label]');
+        const fieldLabelTextarea = wrapper.querySelector('[data-field-label-text]');
+        const fieldLabelTitle = wrapper.querySelector('[data-field-label-title]');
+        const fieldLabelHelp = wrapper.querySelector('[data-field-label-help]');
+        const fieldKeyInput = wrapper.querySelector('[data-field-key]');
+        const fieldRequiredInput = wrapper.querySelector('[data-field-required]');
+        const fieldPlaceholderWrap = wrapper.querySelector('[data-prop-placeholder]');
+        const fieldPlaceholderInput = wrapper.querySelector('[data-field-placeholder]');
+        const fieldDefaultWrap = wrapper.querySelector('[data-prop-default]');
+        const fieldDefaultInput = wrapper.querySelector('[data-field-default]');
+        const fieldFontSizeWrap = wrapper.querySelector('[data-prop-font-size]');
+        const fieldFontSizeInput = wrapper.querySelector('[data-field-font-size]');
+        const fieldOptionsWrap = wrapper.querySelector('[data-prop-options]');
+        const fieldOptionsInput = wrapper.querySelector('[data-field-options]');
+        const fieldValidationWrap = wrapper.querySelector('[data-prop-validation]');
+        const fieldMinInput = wrapper.querySelector('[data-field-min]');
+        const fieldMaxInput = wrapper.querySelector('[data-field-max]');
+        const fieldDividerWrap = wrapper.querySelector('[data-prop-divider]');
+        const fieldDividerInput = wrapper.querySelector('[data-field-divider]');
+        const fieldXInput = wrapper.querySelector('[data-field-x]');
+        const fieldYInput = wrapper.querySelector('[data-field-y]');
+        const fieldWInput = wrapper.querySelector('[data-field-w]');
+        const fieldHInput = wrapper.querySelector('[data-field-h]');
+        const duplicateFieldBtn = wrapper.querySelector('[data-duplicate-field]');
+        const deleteFieldBtn = wrapper.querySelector('[data-delete-field]');
+        const saveBtn = wrapper.querySelector('[data-save-template]');
+        const exportBtn = wrapper.querySelector('[data-export-template]');
+        const tableProperties = wrapper.querySelector('[data-table-properties]');
+        const tableColumnsInput = wrapper.querySelector('[data-table-columns]');
+        const tableHeadersInput = wrapper.querySelector('[data-table-headers]');
+        const tableRowsInput = wrapper.querySelector('[data-table-rows]');
+        const tableIncludeHeaderInput = wrapper.querySelector('[data-table-include-header]');
+        const tableAddRowBtn = wrapper.querySelector('[data-table-add-row]');
+        const tableRemoveRowBtn = wrapper.querySelector('[data-table-remove-row]');
+        const tableCellPaddingInput = wrapper.querySelector('[data-table-cell-padding]');
+        const tableFontSizeInput = wrapper.querySelector('[data-table-font-size]');
+        const tableBorderWidthInput = wrapper.querySelector('[data-table-border-width]');
+        const tableHeaderBackgroundInput = wrapper.querySelector('[data-table-header-background]');
+        const tableHeaderBoldInput = wrapper.querySelector('[data-table-header-bold]');
+
+        const tableModal = wrapper.querySelector('[data-table-modal]');
+        const tableModalColumns = wrapper.querySelector('[data-table-modal-columns]');
+        const tableModalRows = wrapper.querySelector('[data-table-modal-rows]');
+        const tableModalHeader = wrapper.querySelector('[data-table-modal-header]');
+        const tableModalApply = wrapper.querySelector('[data-table-modal-apply]');
+        const tableModalCancelBtns = wrapper.querySelectorAll('[data-table-modal-cancel]');
+
+        const FIELD_TYPES = {
+            text: { label: 'Text', w: 0.4, h: 0.05 },
+            multiline: { label: 'Multiline', w: 0.6, h: 0.12 },
+            number: { label: 'Number', w: 0.25, h: 0.05 },
+            date: { label: 'Date', w: 0.25, h: 0.05 },
+            dropdown: { label: 'Dropdown', w: 0.35, h: 0.05 },
+            checkbox: { label: 'Checkbox', w: 0.04, h: 0.04 },
+            radio: { label: 'Radio group', w: 0.4, h: 0.16 },
+            table: { label: 'Table', w: 0.7, h: 0.25 },
+            signature: { label: 'Signature', w: 0.5, h: 0.05 },
+            heading: { label: 'Heading', w: 0.6, h: 0.05 },
+            paragraph: { label: 'Paragraph', w: 0.6, h: 0.14 },
+            section: { label: 'Section header', w: 0.6, h: 0.05 },
+        };
+
+        const pageSizes = {
+            A4: { width: 595, height: 842 },
+            LETTER: { width: 612, height: 792 },
+        };
+
+        const SNAP_GRID = 0.005;
+        const SNAP_THRESHOLD = 0.008;
+
+        let selectedFieldId = null;
+        let pendingType = null;
+        let isDirty = false;
+        let dragState = null;
+        let resizeState = null;
+        let zoom = 1;
+        let pendingHistory = null;
+        let tableModalState = null;
+        let tableColumnResizeState = null;
+
+        const history = [];
+        const future = [];
+        const HISTORY_LIMIT = 50;
+
+        const state = {
+            id: templateData.id,
+            name: templateData.name || 'Untitled template',
+            page_size: templateData.page_size || 'A4',
+            default_output_mode: templateData.default_output_mode || 'FLATTENED',
+            margins: templateData.margins || { top: 72, right: 48, bottom: 56, left: 48 },
+            fields: (templateData.fields || []).map(raw => {
+                const type = raw.type || 'text';
+                const rawFontSize = raw.font_size;
+                const parsedFontSize = rawFontSize !== undefined && rawFontSize !== null && rawFontSize !== ''
+                    ? Number(rawFontSize)
+                    : null;
+                return {
+                    id: String(raw.id || `field_${Math.random().toString(36).slice(2, 9)}`),
+                    type: type,
+                    label: raw.label || '',
+                    key: raw.key || '',
+                    required: !!raw.required,
+                    x: Number(raw.x ?? 0.1),
+                    y: Number(raw.y ?? 0.1),
+                    w: Number(raw.w ?? 0.2),
+                    h: Number(raw.h ?? 0.05),
+                    options: raw.options || [],
+                    placeholder: raw.placeholder || '',
+                    divider: !!raw.divider,
+                    validation: raw.validation || {},
+                    default_value: raw.default_value || '',
+                    font_size: type === 'table' || !Number.isFinite(parsedFontSize) ? null : parsedFontSize,
+                    table: type === 'table' ? normalizeTable(raw.table) : null,
+                };
+            }),
+        };
+
+        function slugifyKey(value) {
+            return (value || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '') || 'field';
+        }
+
+        function buildUniqueKey(label, excludeId) {
+            const existing = new Set(
+                state.fields
+                    .filter(field => field.id !== excludeId)
+                    .map(field => field.key)
+                    .filter(Boolean)
+            );
+            const base = slugifyKey(label);
+            let key = base;
+            let idx = 2;
+            while (existing.has(key)) {
+                key = `${base}_${idx}`;
+                idx += 1;
+            }
+            return key;
+        }
+
+        function clampInt(value, fallback, min, max) {
+            const parsed = parseInt(value, 10);
+            if (Number.isNaN(parsed)) return fallback;
+            return Math.max(min, Math.min(max, parsed));
+        }
+
+        function buildColumnHeaders(rawHeaders, columns) {
+            let columnHeaders = Array.isArray(rawHeaders) ? rawHeaders.map(String) : [];
+            if (columnHeaders.length !== columns) {
+                columnHeaders = Array.from({ length: columns }, (_, idx) => columnHeaders[idx] || `Column ${idx + 1}`);
+            }
+            return columnHeaders.map((header, idx) => {
+                const trimmed = header.trim();
+                return trimmed ? header : `Column ${idx + 1}`;
+            });
+        }
+
+        function normalizeTable(table) {
+            const source = table || {};
+            const columns = clampInt(source.columns ?? 3, 3, 1, 12);
+            const rows = clampInt(source.rows ?? 2, 2, 1, 50);
+            const includeHeader = source.include_header !== undefined ? !!source.include_header : true;
+            const cellPadding = clampInt(source.cell_padding ?? 2, 2, 0, 24);
+            const fontSize = clampInt(source.font_size ?? 10, 10, 6, 24);
+            const borderWidth = clampInt(source.border_width ?? 1, 1, 1, 6);
+            const headerBackground = !!source.header_background;
+            const headerBold = source.header_bold !== undefined ? !!source.header_bold : true;
+
+            const columnHeaders = buildColumnHeaders(source.column_headers, columns);
+
+            let widths = Array.isArray(source.column_widths)
+                ? source.column_widths.map(val => Number(val))
+                : [];
+            if (widths.length !== columns || widths.some(width => !Number.isFinite(width) || width <= 0)) {
+                widths = Array.from({ length: columns }, () => 1 / columns);
+            } else {
+                const total = widths.reduce((sum, width) => sum + width, 0);
+                widths = total > 0 ? widths.map(width => width / total) : widths.map(() => 1 / columns);
+            }
+
+            return {
+                columns: columns,
+                rows: rows,
+                include_header: includeHeader,
+                column_headers: columnHeaders,
+                column_widths: widths,
+                cell_padding: cellPadding,
+                font_size: fontSize,
+                border_width: borderWidth,
+                header_background: headerBackground,
+                header_bold: headerBold,
+            };
+        }
+
+        function totalTableRows(table) {
+            return table.rows + (table.include_header ? 1 : 0);
+        }
+
+        state.fields.forEach(field => {
+            if (!field.key) {
+                field.key = buildUniqueKey(field.label || field.type, field.id);
+            }
+        });
+
+        function setDirty(value) {
+            isDirty = value;
+            if (saveIndicator) {
+                saveIndicator.textContent = value ? 'Unsaved changes' : 'Saved';
+                saveIndicator.classList.toggle('unsaved', value);
+            }
+        }
+
+        function cloneState() {
+            return {
+                name: state.name,
+                page_size: state.page_size,
+                default_output_mode: state.default_output_mode,
+                margins: { ...state.margins },
+                fields: state.fields.map(field => ({
+                    ...field,
+                    options: Array.isArray(field.options) ? [...field.options] : [],
+                    validation: { ...(field.validation || {}) },
+                    table: field.table
+                        ? {
+                            ...field.table,
+                            column_headers: Array.isArray(field.table.column_headers)
+                                ? [...field.table.column_headers]
+                                : [],
+                            column_widths: Array.isArray(field.table.column_widths)
+                                ? [...field.table.column_widths]
+                                : [],
+                        }
+                        : null,
+                })),
+            };
+        }
+
+        function pushHistory(snapshot) {
+            history.push(snapshot);
+            if (history.length > HISTORY_LIMIT) {
+                history.shift();
+            }
+        }
+
+        function recordHistory() {
+            pushHistory(cloneState());
+            future.length = 0;
+        }
+
+        function applyState(snapshot) {
+            state.name = snapshot.name;
+            state.page_size = snapshot.page_size;
+            state.default_output_mode = snapshot.default_output_mode;
+            state.margins = { ...snapshot.margins };
+            state.fields = snapshot.fields.map(field => ({
+                ...field,
+                options: Array.isArray(field.options) ? [...field.options] : [],
+                validation: { ...(field.validation || {}) },
+                table: field.table ? normalizeTable(field.table) : null,
+            }));
+            if (selectedFieldId && !state.fields.some(field => field.id === selectedFieldId)) {
+                selectedFieldId = null;
+            }
+            if (templateNameInput) templateNameInput.value = state.name;
+            if (templateOutputSelect) templateOutputSelect.value = state.default_output_mode;
+            if (pageSizeSelect) pageSizeSelect.value = state.page_size;
+            if (marginTopInput) marginTopInput.value = state.margins.top;
+            if (marginRightInput) marginRightInput.value = state.margins.right;
+            if (marginBottomInput) marginBottomInput.value = state.margins.bottom;
+            if (marginLeftInput) marginLeftInput.value = state.margins.left;
+            updatePageSize();
+            renderCanvas();
+            updateProperties();
+            setDirty(true);
+        }
+
+        function undo() {
+            if (!history.length) return;
+            future.push(cloneState());
+            const snapshot = history.pop();
+            applyState(snapshot);
+        }
+
+        function redo() {
+            if (!future.length) return;
+            pushHistory(cloneState());
+            const snapshot = future.pop();
+            applyState(snapshot);
+        }
+
+        function getMinSize(field) {
+            if (field.type === 'checkbox' || field.type === 'radio') {
+                return { w: 0.03, h: 0.03 };
+            }
+            if (field.type === 'signature') {
+                return { w: 0.2, h: 0.04 };
+            }
+            if (field.type === 'paragraph') {
+                return { w: 0.2, h: 0.08 };
+            }
+            if (field.type === 'heading' || field.type === 'section') {
+                return { w: 0.2, h: 0.04 };
+            }
+            if (field.type === 'table') {
+                return { w: 0.3, h: 0.12 };
+            }
+            return { w: 0.08, h: 0.04 };
+        }
+
+        function snapValue(value, step) {
+            return Math.round(value / step) * step;
+        }
+
+        function applySnap(field, x, y) {
+            let nextX = snapValue(x, SNAP_GRID);
+            let nextY = snapValue(y, SNAP_GRID);
+
+            state.fields.forEach(other => {
+                if (other.id === field.id) return;
+                const xCandidates = [
+                    other.x,
+                    other.x + other.w,
+                    other.x + other.w / 2,
+                    other.x - field.w,
+                    other.x + other.w - field.w,
+                    other.x + other.w / 2 - field.w / 2,
+                ];
+                xCandidates.forEach(candidate => {
+                    if (Math.abs(nextX - candidate) < SNAP_THRESHOLD) {
+                        nextX = candidate;
+                    }
+                });
+
+                const yCandidates = [
+                    other.y,
+                    other.y + other.h,
+                    other.y + other.h / 2,
+                    other.y - field.h,
+                    other.y + other.h - field.h,
+                    other.y + other.h / 2 - field.h / 2,
+                ];
+                yCandidates.forEach(candidate => {
+                    if (Math.abs(nextY - candidate) < SNAP_THRESHOLD) {
+                        nextY = candidate;
+                    }
+                });
+            });
+
+            nextX = Math.max(0, Math.min(1 - field.w, nextX));
+            nextY = Math.max(0, Math.min(1 - field.h, nextY));
+
+            return { x: nextX, y: nextY };
+        }
+
+        function showMessage(message, type) {
+            if (!messageStack) return;
+            messageStack.hidden = false;
+            messageStack.innerHTML = `<div class="message ${type || ''}">${message}</div>`;
+        }
+
+        function clearMessage() {
+            if (!messageStack) return;
+            messageStack.hidden = true;
+            messageStack.innerHTML = '';
+        }
+
+        function updatePageSize() {
+            const size = pageSizes[state.page_size] || pageSizes.A4;
+            canvasPage.style.width = `${size.width}px`;
+            canvasPage.style.height = `${size.height}px`;
+            canvasPage.style.transform = `scale(${zoom})`;
+            if (canvasMargins) {
+                canvasMargins.style.top = `${state.margins.top}px`;
+                canvasMargins.style.right = `${state.margins.right}px`;
+                canvasMargins.style.bottom = `${state.margins.bottom}px`;
+                canvasMargins.style.left = `${state.margins.left}px`;
+            }
+        }
+
+        function renderCanvas() {
+            canvasLayer.innerHTML = '';
+            state.fields.forEach(field => {
+                const item = document.createElement('div');
+                item.className = `canvas-item canvas-item--${field.type}`;
+                if (field.id === selectedFieldId) item.classList.add('selected');
+                item.dataset.fieldId = field.id;
+                item.style.left = `${field.x * 100}%`;
+                item.style.top = `${field.y * 100}%`;
+                item.style.width = `${field.w * 100}%`;
+                item.style.height = `${field.h * 100}%`;
+                const defaultFontSize = ['section', 'heading', 'paragraph'].includes(field.type) ? 12 : 10;
+                const resolvedFontSize = field.font_size || defaultFontSize;
+                item.style.setProperty('--field-font-size', `${resolvedFontSize}px`);
+
+                if (field.type === 'section' || field.type === 'heading' || field.type === 'paragraph') {
+                    item.classList.add('canvas-item--section');
+                    const titleText = field.label || (field.type === 'heading' ? 'Heading' : 'Paragraph');
+                    item.innerHTML = `
+                        <div class="canvas-section-title">${titleText}</div>
+                        ${(field.divider || field.type === 'heading') ? '<div class="canvas-divider"></div>' : ''}
+                    `;
+                } else if (field.type === 'radio') {
+                    item.classList.add('canvas-item--radio-group');
+                    const label = field.label || FIELD_TYPES[field.type]?.label || 'Radio group';
+                    const options = (field.options || ['Option 1', 'Option 2']).slice(0, 3);
+                    const rows = options.map(option => `
+                        <div class="canvas-radio-row">
+                            <span class="canvas-radio"></span>
+                            <span class="canvas-checkbox-label">${option}</span>
+                        </div>
+                    `).join('');
+                    const overflow = (field.options || []).length > options.length ? `<div class="canvas-radio-more">+${field.options.length - options.length} more</div>` : '';
+                    item.innerHTML = `
+                        <div class="canvas-section-title">${label}</div>
+                        <div class="canvas-radio-list">${rows}${overflow}</div>
+                    `;
+                } else if (field.type === 'table') {
+                    item.classList.add('canvas-item--table');
+                    const table = normalizeTable(field.table || {});
+                    field.table = table;
+                    const totalRows = Math.max(1, totalTableRows(table));
+                    const grid = document.createElement('div');
+                    grid.className = 'canvas-table';
+                    grid.style.gridTemplateColumns = table.column_widths.map(width => `${width * 100}%`).join(' ');
+                    grid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
+                    grid.style.setProperty('--table-border-width', `${table.border_width}px`);
+                    grid.style.setProperty('--table-cell-padding', `${table.cell_padding}px`);
+                    grid.style.setProperty('--table-font-size', `${table.font_size}px`);
+                    for (let row = 0; row < totalRows; row += 1) {
+                        for (let col = 0; col < table.columns; col += 1) {
+                            const cell = document.createElement('div');
+                            cell.className = 'canvas-table-cell';
+                            if (col === table.columns - 1) cell.classList.add('last-col');
+                            if (row === totalRows - 1) cell.classList.add('last-row');
+                            if (table.include_header && row === 0) {
+                                cell.classList.add('header');
+                                if (table.header_background) cell.classList.add('header-filled');
+                                if (table.header_bold) cell.classList.add('header-bold');
+                                cell.textContent = table.column_headers[col] || `Column ${col + 1}`;
+                            }
+                            grid.appendChild(cell);
+                        }
+                    }
+                    item.appendChild(grid);
+                    if (field.id === selectedFieldId) {
+                        const handlesWrap = document.createElement('div');
+                        handlesWrap.className = 'canvas-table-handles';
+                        let offset = 0;
+                        for (let idx = 0; idx < table.columns - 1; idx += 1) {
+                            offset += table.column_widths[idx] || 0;
+                            const handle = document.createElement('div');
+                            handle.className = 'canvas-table-handle';
+                            handle.style.left = `${offset * 100}%`;
+                            handle.dataset.tableColResize = String(idx);
+                            handlesWrap.appendChild(handle);
+                        }
+                        item.appendChild(handlesWrap);
+
+                        const addRowBtn = document.createElement('button');
+                        addRowBtn.type = 'button';
+                        addRowBtn.className = 'canvas-table-add';
+                        addRowBtn.textContent = '+ Row';
+                        addRowBtn.dataset.tableAddRow = 'true';
+                        item.appendChild(addRowBtn);
+                    }
+                } else if (field.type === 'checkbox') {
+                    item.classList.add('canvas-item--checkbox');
+                    const label = field.label || FIELD_TYPES[field.type]?.label || 'Checkbox';
+                    item.innerHTML = `
+                        <div class="canvas-checkbox"></div>
+                        <div class="canvas-checkbox-label">${label}</div>
+                    `;
+                } else {
+                    const label = document.createElement('div');
+                    label.className = 'canvas-label';
+                    label.textContent = field.label || FIELD_TYPES[field.type]?.label || 'Field';
+                    const body = document.createElement('div');
+                    body.className = 'canvas-body';
+                    item.appendChild(label);
+                    item.appendChild(body);
+                }
+                const handle = document.createElement('div');
+                handle.className = 'resize-handle';
+                item.appendChild(handle);
+                canvasLayer.appendChild(item);
+            });
+        }
+
+        function updateProperties() {
+            const field = state.fields.find(f => f.id === selectedFieldId);
+            if (!field) {
+                if (propertiesPanel) propertiesPanel.hidden = true;
+                if (propertiesEmpty) propertiesEmpty.hidden = false;
+                return;
+            }
+            if (propertiesPanel) propertiesPanel.hidden = false;
+            if (propertiesEmpty) propertiesEmpty.hidden = true;
+
+            const isParagraph = field.type === 'paragraph';
+            fieldLabelInput.value = field.label || '';
+            if (fieldLabelTextarea) fieldLabelTextarea.value = field.label || '';
+            if (fieldLabelTitle) fieldLabelTitle.textContent = isParagraph ? 'Paragraph text' : 'Label';
+            if (fieldLabelInput) fieldLabelInput.hidden = isParagraph;
+            if (fieldLabelTextarea) fieldLabelTextarea.hidden = !isParagraph;
+            if (fieldLabelHelp) fieldLabelHelp.hidden = !isParagraph;
+            fieldKeyInput.value = field.key || '';
+            fieldRequiredInput.checked = !!field.required;
+            fieldPlaceholderInput.value = field.placeholder || '';
+            fieldDefaultInput.value = field.default_value || '';
+            if (fieldFontSizeInput) fieldFontSizeInput.value = field.font_size ?? '';
+            fieldOptionsInput.value = (field.options || []).join('\n');
+            fieldMinInput.value = field.validation.min ?? field.validation.min_length ?? '';
+            fieldMaxInput.value = field.validation.max ?? field.validation.max_length ?? '';
+            fieldDividerInput.checked = !!field.divider;
+            fieldXInput.value = (field.x * 100).toFixed(1);
+            fieldYInput.value = (field.y * 100).toFixed(1);
+            fieldWInput.value = (field.w * 100).toFixed(1);
+            fieldHInput.value = (field.h * 100).toFixed(1);
+
+            const isTable = field.type === 'table';
+            if (isTable) {
+                const table = normalizeTable(field.table || {});
+                field.table = table;
+                if (tableColumnsInput) tableColumnsInput.value = table.columns;
+                if (tableHeadersInput) tableHeadersInput.value = (table.column_headers || []).join('\n');
+                if (tableRowsInput) tableRowsInput.value = table.rows;
+                if (tableIncludeHeaderInput) tableIncludeHeaderInput.checked = table.include_header;
+                if (tableCellPaddingInput) tableCellPaddingInput.value = table.cell_padding;
+                if (tableFontSizeInput) tableFontSizeInput.value = table.font_size;
+                if (tableBorderWidthInput) tableBorderWidthInput.value = table.border_width;
+                if (tableHeaderBackgroundInput) tableHeaderBackgroundInput.checked = table.header_background;
+                if (tableHeaderBoldInput) tableHeaderBoldInput.checked = table.header_bold;
+            }
+            if (tableProperties) tableProperties.hidden = !isTable;
+
+            const isInput = !['section', 'heading', 'paragraph', 'table'].includes(field.type);
+            const showPlaceholder = ['text', 'multiline'].includes(field.type);
+            const showOptions = ['dropdown', 'radio'].includes(field.type);
+            const showValidation = ['text', 'multiline', 'number', 'date'].includes(field.type);
+            const showDivider = field.type === 'section' || field.type === 'heading';
+            const showDefault = isInput;
+            const showFontSize = field.type !== 'table';
+
+            if (fieldPlaceholderWrap) fieldPlaceholderWrap.hidden = !showPlaceholder;
+            if (fieldDefaultWrap) fieldDefaultWrap.hidden = !showDefault;
+            if (fieldFontSizeWrap) fieldFontSizeWrap.hidden = !showFontSize;
+            if (fieldOptionsWrap) fieldOptionsWrap.hidden = !showOptions;
+            if (fieldValidationWrap) fieldValidationWrap.hidden = !showValidation;
+            if (fieldDividerWrap) fieldDividerWrap.hidden = !showDivider;
+            const requiredWrap = wrapper.querySelector('[data-prop-required]');
+            if (requiredWrap) requiredWrap.hidden = !isInput;
+        }
+
+        function selectField(fieldId) {
+            selectedFieldId = fieldId;
+            renderCanvas();
+            updateProperties();
+        }
+
+        function addField(type, x, y) {
+            recordHistory();
+            const spec = FIELD_TYPES[type] || FIELD_TYPES.text;
+            const field = {
+                id: `field_${Math.random().toString(36).slice(2, 9)}`,
+                type: type,
+                label: spec.label,
+                key: buildUniqueKey(spec.label, null),
+                required: false,
+                x: x,
+                y: y,
+                w: spec.w,
+                h: spec.h,
+                options: type === 'dropdown' || type === 'radio' ? ['Option 1', 'Option 2'] : [],
+                placeholder: '',
+                divider: type === 'section',
+                validation: {},
+                default_value: '',
+                font_size: null,
+                table: type === 'table' ? normalizeTable({ columns: 3, rows: 2, include_header: true }) : null,
+            };
+            const snapped = applySnap(field, field.x, field.y);
+            field.x = snapped.x;
+            field.y = snapped.y;
+            state.fields.push(field);
+            setDirty(true);
+            selectField(field.id);
+            if (type === 'table') {
+                openTableModal(field.id, true);
+            }
+        }
+
+        function openTableModal(fieldId, isNew) {
+            if (!tableModal) return;
+            const field = state.fields.find(item => item.id === fieldId);
+            if (!field) return;
+            const table = normalizeTable(field.table || {});
+            field.table = table;
+            if (tableModalColumns) tableModalColumns.value = table.columns;
+            if (tableModalRows) tableModalRows.value = table.rows;
+            if (tableModalHeader) tableModalHeader.checked = table.include_header;
+            tableModal.hidden = false;
+            tableModalState = { fieldId: fieldId, isNew: !!isNew };
+        }
+
+        function closeTableModal(cancelled) {
+            if (!tableModal) return;
+            tableModal.hidden = true;
+            const currentState = tableModalState;
+            tableModalState = null;
+            if (cancelled && currentState && currentState.isNew) {
+                const idx = state.fields.findIndex(field => field.id === currentState.fieldId);
+                if (idx !== -1) {
+                    state.fields.splice(idx, 1);
+                    selectedFieldId = null;
+                    setDirty(true);
+                    renderCanvas();
+                    updateProperties();
+                }
+            }
+        }
+
+        function clampField(field) {
+            const minSize = getMinSize(field);
+            field.w = Math.max(minSize.w, Math.min(1, field.w));
+            field.h = Math.max(minSize.h, Math.min(1, field.h));
+            field.x = Math.max(0, Math.min(1 - field.w, field.x));
+            field.y = Math.max(0, Math.min(1 - field.h, field.y));
+        }
+
+        function updateSelectedField(updates, options = {}) {
+            const field = state.fields.find(f => f.id === selectedFieldId);
+            if (!field) return;
+            if (!options.skipHistory) {
+                recordHistory();
+            }
+            Object.assign(field, updates);
+            clampField(field);
+            setDirty(true);
+            renderCanvas();
+            updateProperties();
+        }
+
+        function updateTableField(fieldId, tableUpdates, fieldUpdates = {}, options = {}) {
+            const field = state.fields.find(f => f.id === fieldId);
+            if (!field) return;
+            const nextTable = normalizeTable({ ...(field.table || {}), ...tableUpdates });
+            updateSelectedField({ ...fieldUpdates, table: nextTable }, options);
+        }
+
+        function addTableRows(fieldId, delta) {
+            const field = state.fields.find(f => f.id === fieldId);
+            if (!field || !field.table) return;
+            const table = normalizeTable(field.table);
+            const nextRows = table.rows + delta;
+            if (nextRows < 1 || nextRows > 50) {
+                showMessage('Table rows must be between 1 and 50.', 'warning');
+                updateProperties();
+                return;
+            }
+            const totalRows = totalTableRows(table);
+            if (totalRows <= 0) return;
+            const rowHeight = field.h / totalRows;
+            const nextHeight = field.h + (rowHeight * delta);
+            if (nextHeight <= 0) return;
+            if (field.y + nextHeight > 1) {
+                showMessage('Table exceeds page bounds. Resize or reduce rows.', 'warning');
+                updateProperties();
+                return;
+            }
+            updateTableField(fieldId, { rows: nextRows }, { h: nextHeight });
+        }
+
+        function deleteSelectedField() {
+            const idx = state.fields.findIndex(f => f.id === selectedFieldId);
+            if (idx === -1) return;
+            recordHistory();
+            state.fields.splice(idx, 1);
+            selectedFieldId = null;
+            setDirty(true);
+            renderCanvas();
+            updateProperties();
+        }
+
+        function getCanvasCoords(event) {
+            const rect = canvasLayer.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+            return {
+                x: Math.max(0, Math.min(1, x)),
+                y: Math.max(0, Math.min(1, y)),
+            };
+        }
+
+        function beginPlacement(type) {
+            pendingType = type;
+            if (placementHint) placementHint.hidden = false;
+            if (paletteGrid) {
+                paletteGrid.querySelectorAll('.palette-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.fieldType === type);
+                });
+            }
+        }
+
+        function endPlacement() {
+            pendingType = null;
+            if (placementHint) placementHint.hidden = true;
+            if (paletteGrid) {
+                paletteGrid.querySelectorAll('.palette-item').forEach(item => item.classList.remove('active'));
+            }
+        }
+
+        if (paletteGrid) {
+            paletteGrid.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-field-type]');
+                if (!button) return;
+                beginPlacement(button.dataset.fieldType);
+            });
+            paletteGrid.querySelectorAll('[data-field-type]').forEach(button => {
+                button.addEventListener('dragstart', (event) => {
+                    event.dataTransfer.setData('text/plain', button.dataset.fieldType);
+                });
+            });
+        }
+
+        if (addFieldBtn) {
+            addFieldBtn.addEventListener('click', () => {
+                const type = addTypeSelect ? addTypeSelect.value : 'text';
+                beginPlacement(type);
+            });
+        }
+
+        canvasLayer.addEventListener('dragover', (event) => {
+            event.preventDefault();
+        });
+        canvasLayer.addEventListener('drop', (event) => {
+            event.preventDefault();
+            const type = event.dataTransfer.getData('text/plain');
+            if (!type) return;
+            const coords = getCanvasCoords(event);
+            addField(type, coords.x, coords.y);
+            endPlacement();
+        });
+
+        canvasLayer.addEventListener('click', (event) => {
+            const tableAddBtn = event.target.closest('[data-table-add-row]');
+            if (tableAddBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                const fieldEl = tableAddBtn.closest('[data-field-id]');
+                if (fieldEl) {
+                    addTableRows(fieldEl.dataset.fieldId, 1);
+                }
+                return;
+            }
+            const fieldEl = event.target.closest('[data-field-id]');
+            if (fieldEl) {
+                selectField(fieldEl.dataset.fieldId);
+                return;
+            }
+            if (pendingType) {
+                const coords = getCanvasCoords(event);
+                addField(pendingType, coords.x, coords.y);
+                endPlacement();
+            }
+        });
+
+        canvasLayer.addEventListener('mousedown', (event) => {
+            const tableHandle = event.target.closest('[data-table-col-resize]');
+            if (tableHandle) {
+                event.preventDefault();
+                event.stopPropagation();
+                const fieldEl = tableHandle.closest('[data-field-id]');
+                if (!fieldEl) return;
+                const field = state.fields.find(f => f.id === fieldEl.dataset.fieldId);
+                if (!field || field.type !== 'table' || !field.table) return;
+                const rect = fieldEl.getBoundingClientRect();
+                if (field.id !== selectedFieldId) {
+                    selectedFieldId = field.id;
+                    renderCanvas();
+                    updateProperties();
+                }
+                const colIndex = parseInt(tableHandle.dataset.tableColResize || '0', 10);
+                tableColumnResizeState = {
+                    fieldId: field.id,
+                    colIndex: colIndex,
+                    startX: event.clientX,
+                    rect: rect,
+                    widths: [...field.table.column_widths],
+                };
+                pendingHistory = cloneState();
+                return;
+            }
+            if (event.target.closest('[data-table-add-row]')) {
+                event.preventDefault();
+                return;
+            }
+            const resizeHandle = event.target.closest('.resize-handle');
+            if (resizeHandle) {
+                const fieldEl = resizeHandle.closest('[data-field-id]');
+                if (!fieldEl) return;
+                const field = state.fields.find(f => f.id === fieldEl.dataset.fieldId);
+                if (!field) return;
+                selectField(field.id);
+                const rect = canvasLayer.getBoundingClientRect();
+                pendingHistory = cloneState();
+                resizeState = {
+                    fieldId: field.id,
+                    startX: (event.clientX - rect.left) / rect.width,
+                    startY: (event.clientY - rect.top) / rect.height,
+                    startW: field.w,
+                    startH: field.h,
+                };
+                event.preventDefault();
+                return;
+            }
+            const fieldEl = event.target.closest('[data-field-id]');
+            if (!fieldEl) return;
+            const field = state.fields.find(f => f.id === fieldEl.dataset.fieldId);
+            if (!field) return;
+            selectField(field.id);
+            const rect = canvasLayer.getBoundingClientRect();
+            pendingHistory = cloneState();
+            dragState = {
+                fieldId: field.id,
+                offsetX: (event.clientX - rect.left) / rect.width - field.x,
+                offsetY: (event.clientY - rect.top) / rect.height - field.y,
+            };
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            const rect = canvasLayer.getBoundingClientRect();
+            if (tableColumnResizeState) {
+                const { fieldId, colIndex, startX, rect: tableRect, widths } = tableColumnResizeState;
+                const field = state.fields.find(f => f.id === fieldId);
+                if (!field || !field.table) return;
+                if (!tableRect.width) return;
+                const widthLeft = Number(widths[colIndex]) || 0;
+                const widthRight = Number(widths[colIndex + 1]) || 0;
+                const total = widthLeft + widthRight;
+                if (total <= 0) return;
+                const delta = (event.clientX - startX) / tableRect.width;
+                const minRatio = Math.max(0.05, 24 / tableRect.width);
+                let nextLeft = widthLeft + delta;
+                nextLeft = Math.max(minRatio, Math.min(total - minRatio, nextLeft));
+                const nextRight = total - nextLeft;
+                const nextWidths = [...widths];
+                nextWidths[colIndex] = nextLeft;
+                nextWidths[colIndex + 1] = nextRight;
+                updateTableField(fieldId, { column_widths: nextWidths }, {}, { skipHistory: true });
+                tableColumnResizeState.startX = event.clientX;
+                tableColumnResizeState.widths = nextWidths;
+                return;
+            }
+            if (resizeState) {
+                const field = state.fields.find(f => f.id === resizeState.fieldId);
+                if (!field) return;
+                const currentX = (event.clientX - rect.left) / rect.width;
+                const currentY = (event.clientY - rect.top) / rect.height;
+                const deltaX = currentX - resizeState.startX;
+                const deltaY = currentY - resizeState.startY;
+                const minSize = getMinSize(field);
+                let nextW = resizeState.startW + deltaX;
+                let nextH = resizeState.startH + deltaY;
+                nextW = Math.max(minSize.w, Math.min(1 - field.x, nextW));
+                nextH = Math.max(minSize.h, Math.min(1 - field.y, nextH));
+                updateSelectedField({ w: nextW, h: nextH }, { skipHistory: true });
+                return;
+            }
+            if (!dragState) return;
+            const x = (event.clientX - rect.left) / rect.width - dragState.offsetX;
+            const y = (event.clientY - rect.top) / rect.height - dragState.offsetY;
+            const field = state.fields.find(f => f.id === dragState.fieldId);
+            if (!field) return;
+            const snapped = applySnap(field, x, y);
+            updateSelectedField({ x: snapped.x, y: snapped.y }, { skipHistory: true });
+        });
+
+        document.addEventListener('mouseup', () => {
+            dragState = null;
+            resizeState = null;
+            tableColumnResizeState = null;
+            if (pendingHistory) {
+                pushHistory(pendingHistory);
+                future.length = 0;
+                pendingHistory = null;
+            }
+        });
+
+        if (templateNameInput) {
+            templateNameInput.addEventListener('input', () => {
+                recordHistory();
+                state.name = templateNameInput.value;
+                setDirty(true);
+            });
+        }
+        if (templateOutputSelect) {
+            templateOutputSelect.addEventListener('change', () => {
+                recordHistory();
+                state.default_output_mode = templateOutputSelect.value;
+                setDirty(true);
+            });
+        }
+        [marginTopInput, marginRightInput, marginBottomInput, marginLeftInput].forEach((input, idx) => {
+            if (!input) return;
+            input.addEventListener('input', () => {
+                recordHistory();
+                const values = [marginTopInput, marginRightInput, marginBottomInput, marginLeftInput].map(el => parseInt(el.value || '0', 10));
+                state.margins = { top: values[0], right: values[1], bottom: values[2], left: values[3] };
+                updatePageSize();
+                setDirty(true);
+            });
+        });
+
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', () => {
+                recordHistory();
+                state.page_size = pageSizeSelect.value;
+                updatePageSize();
+                setDirty(true);
+            });
+        }
+
+        wrapper.querySelectorAll('[data-zoom]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                zoom = parseFloat(btn.dataset.zoom);
+                wrapper.querySelectorAll('[data-zoom]').forEach(el => el.classList.toggle('active', el === btn));
+                updatePageSize();
+            });
+        });
+
+        function syncFieldInputs() {
+            if (!selectedFieldId) return;
+            const currentField = state.fields.find(f => f.id === selectedFieldId);
+            if (!currentField) return;
+            const isTable = currentField.type === 'table';
+            const isInput = !['section', 'heading', 'paragraph', 'table'].includes(currentField.type);
+            const showPlaceholder = ['text', 'multiline'].includes(currentField.type);
+            const showOptions = ['dropdown', 'radio'].includes(currentField.type);
+            const showValidation = ['text', 'multiline', 'number', 'date'].includes(currentField.type);
+            const showDivider = currentField.type === 'section' || currentField.type === 'heading';
+            const showDefault = isInput;
+            const showFontSize = currentField.type !== 'table';
+            const labelValue = (currentField.type === 'paragraph' && fieldLabelTextarea)
+                ? fieldLabelTextarea.value
+                : fieldLabelInput.value;
+            const fontSizeValue = showFontSize && fieldFontSizeInput && fieldFontSizeInput.value
+                ? clampInt(fieldFontSizeInput.value, null, 6, 48)
+                : null;
+            const validation = {};
+            const minValue = fieldMinInput.value || '';
+            const maxValue = fieldMaxInput.value || '';
+            if (['text', 'multiline'].includes(currentField.type)) {
+                if (minValue) validation.min_length = minValue;
+                if (maxValue) validation.max_length = maxValue;
+            } else {
+                if (minValue) validation.min = minValue;
+                if (maxValue) validation.max = maxValue;
+            }
+            const nextKey = fieldKeyInput.value || buildUniqueKey(labelValue, currentField.id);
+            if (!fieldKeyInput.value && nextKey) {
+                fieldKeyInput.value = nextKey;
+            }
+            const updates = {
+                label: labelValue,
+                key: nextKey,
+                required: isInput ? fieldRequiredInput.checked : false,
+            };
+            if (showFontSize) {
+                updates.font_size = fontSizeValue;
+            } else {
+                updates.font_size = null;
+            }
+            if (showPlaceholder) {
+                updates.placeholder = fieldPlaceholderInput.value;
+            }
+            if (showDefault && !isTable) {
+                updates.default_value = fieldDefaultInput.value;
+            } else if (!isInput) {
+                updates.default_value = '';
+            }
+            if (showOptions) {
+                updates.options = fieldOptionsInput.value.split('\n').map(opt => opt.trim()).filter(Boolean);
+            } else if (!isTable) {
+                updates.options = [];
+            }
+            if (showValidation) {
+                updates.validation = validation;
+            } else {
+                updates.validation = {};
+            }
+            updates.divider = showDivider ? fieldDividerInput.checked : false;
+            updateSelectedField(updates);
+        }
+
+        [fieldLabelInput, fieldLabelTextarea, fieldKeyInput, fieldRequiredInput, fieldPlaceholderInput, fieldDefaultInput, fieldFontSizeInput, fieldOptionsInput, fieldMinInput, fieldMaxInput, fieldDividerInput].forEach(input => {
+            if (!input) return;
+            input.addEventListener('input', syncFieldInputs);
+            input.addEventListener('change', syncFieldInputs);
+        });
+
+        [fieldXInput, fieldYInput, fieldWInput, fieldHInput].forEach(input => {
+            if (!input) return;
+            input.addEventListener('input', () => {
+                const x = parseFloat(fieldXInput.value || '0') / 100;
+                const y = parseFloat(fieldYInput.value || '0') / 100;
+                const w = parseFloat(fieldWInput.value || '10') / 100;
+                const h = parseFloat(fieldHInput.value || '4') / 100;
+                updateSelectedField({ x: x, y: y, w: w, h: h });
+            });
+        });
+
+        if (tableRowsInput) {
+            tableRowsInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                const nextRows = clampInt(tableRowsInput.value, field.table?.rows ?? 1, 1, 50);
+                const delta = nextRows - (field.table?.rows ?? 1);
+                if (delta === 0) return;
+                addTableRows(field.id, delta);
+            });
+        }
+
+        if (tableHeadersInput) {
+            tableHeadersInput.addEventListener('input', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                const currentColumns = field.table?.columns ?? 1;
+                const rawHeaders = tableHeadersInput.value.split('\n');
+                const column_headers = buildColumnHeaders(rawHeaders, currentColumns);
+                updateTableField(field.id, { column_headers: column_headers });
+            });
+        }
+
+        if (tableIncludeHeaderInput) {
+            tableIncludeHeaderInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                updateTableField(field.id, { include_header: tableIncludeHeaderInput.checked });
+            });
+        }
+
+        if (tableAddRowBtn) {
+            tableAddRowBtn.addEventListener('click', () => {
+                if (!selectedFieldId) return;
+                addTableRows(selectedFieldId, 1);
+            });
+        }
+
+        if (tableRemoveRowBtn) {
+            tableRemoveRowBtn.addEventListener('click', () => {
+                if (!selectedFieldId) return;
+                addTableRows(selectedFieldId, -1);
+            });
+        }
+
+        if (tableCellPaddingInput) {
+            tableCellPaddingInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                updateTableField(field.id, { cell_padding: tableCellPaddingInput.value });
+            });
+        }
+
+        if (tableFontSizeInput) {
+            tableFontSizeInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                updateTableField(field.id, { font_size: tableFontSizeInput.value });
+            });
+        }
+
+        if (tableBorderWidthInput) {
+            tableBorderWidthInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                updateTableField(field.id, { border_width: tableBorderWidthInput.value });
+            });
+        }
+
+        if (tableHeaderBackgroundInput) {
+            tableHeaderBackgroundInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                updateTableField(field.id, { header_background: tableHeaderBackgroundInput.checked });
+            });
+        }
+
+        if (tableHeaderBoldInput) {
+            tableHeaderBoldInput.addEventListener('change', () => {
+                if (!selectedFieldId) return;
+                const field = state.fields.find(item => item.id === selectedFieldId);
+                if (!field || field.type !== 'table') return;
+                updateTableField(field.id, { header_bold: tableHeaderBoldInput.checked });
+            });
+        }
+
+        if (duplicateFieldBtn) {
+            duplicateFieldBtn.addEventListener('click', () => {
+                const field = state.fields.find(f => f.id === selectedFieldId);
+                if (!field) return;
+                recordHistory();
+                const copy = {
+                    ...field,
+                    id: `field_${Math.random().toString(36).slice(2, 9)}`,
+                    key: '',
+                    table: field.table
+                        ? normalizeTable({
+                            ...field.table,
+                            column_headers: Array.isArray(field.table.column_headers)
+                                ? [...field.table.column_headers]
+                                : [],
+                            column_widths: Array.isArray(field.table.column_widths)
+                                ? [...field.table.column_widths]
+                                : [],
+                        })
+                        : null,
+                };
+                copy.x = Math.min(1 - copy.w, copy.x + 0.02);
+                copy.y = Math.min(1 - copy.h, copy.y + 0.02);
+                state.fields.push(copy);
+                setDirty(true);
+                selectField(copy.id);
+            });
+        }
+
+        if (deleteFieldBtn) {
+            deleteFieldBtn.addEventListener('click', () => {
+                deleteSelectedField();
+            });
+        }
+
+        if (tableModalApply) {
+            tableModalApply.addEventListener('click', () => {
+                if (!tableModalState) return;
+                const field = state.fields.find(item => item.id === tableModalState.fieldId);
+                if (!field) return;
+                const rawColumns = parseInt(tableModalColumns?.value || '0', 10);
+                const rawRows = parseInt(tableModalRows?.value || '0', 10);
+                if (!rawColumns || rawColumns < 1 || rawColumns > 12) {
+                    showMessage('Table columns must be between 1 and 12.', 'warning');
+                    return;
+                }
+                if (!rawRows || rawRows < 1 || rawRows > 50) {
+                    showMessage('Table rows must be between 1 and 50.', 'warning');
+                    return;
+                }
+                const prevColumns = field.table?.columns ?? rawColumns;
+                const tableUpdates = {
+                    columns: rawColumns,
+                    rows: rawRows,
+                    include_header: tableModalHeader ? tableModalHeader.checked : true,
+                };
+                if (rawColumns !== prevColumns) {
+                    tableUpdates.column_headers = buildColumnHeaders(
+                        field.table?.column_headers || [],
+                        rawColumns
+                    );
+                    tableUpdates.column_widths = Array.from(
+                        { length: rawColumns },
+                        () => 1 / rawColumns
+                    );
+                }
+                updateTableField(field.id, tableUpdates);
+                closeTableModal(false);
+            });
+        }
+
+        if (tableModalCancelBtns.length) {
+            tableModalCancelBtns.forEach(btn => {
+                btn.addEventListener('click', () => closeTableModal(true));
+            });
+        }
+
+        if (tableModal) {
+            tableModal.addEventListener('click', (event) => {
+                if (event.target === tableModal) {
+                    closeTableModal(true);
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.defaultPrevented) return;
+            const target = event.target;
+            const isEditable = target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.tagName === 'SELECT' ||
+                target.isContentEditable
+            );
+            if (isEditable) return;
+
+            if (event.key === 'Delete' && selectedFieldId) {
+                event.preventDefault();
+                deleteSelectedField();
+                return;
+            }
+
+            const hasModifier = event.ctrlKey || event.metaKey;
+            if (!hasModifier) return;
+            if (event.key.toLowerCase() === 'z') {
+                event.preventDefault();
+                if (event.shiftKey) {
+                    redo();
+                } else {
+                    undo();
+                }
+                return;
+            }
+            if (event.key.toLowerCase() === 'y') {
+                event.preventDefault();
+                redo();
+            }
+        });
+
+        async function saveTemplate() {
+            clearMessage();
+            const payload = {
+                name: state.name,
+                page_size: state.page_size,
+                default_output_mode: state.default_output_mode,
+                margins: state.margins,
+                    fields: state.fields.map((field, idx) => ({
+                        id: field.id,
+                        type: field.type,
+                        label: field.label,
+                        key: field.key,
+                        required: field.required,
+                        x: field.x,
+                        y: field.y,
+                        w: field.w,
+                        h: field.h,
+                        options: field.options,
+                        placeholder: field.placeholder,
+                        divider: field.divider,
+                        validation: field.validation,
+                        default_value: field.default_value,
+                        font_size: field.font_size,
+                        table: field.table,
+                        order: idx,
+                    })),
+            };
+            try {
+                const res = await fetch(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const message = data.message || 'Unable to save template.';
+                    showMessage(message, 'error');
+                    setDirty(true);
+                    return;
+                }
+                if (data.field_errors && data.field_errors.length) {
+                    showMessage(data.field_errors[0].message || 'Field validation failed.', 'error');
+                    setDirty(true);
+                    return;
+                }
+                setDirty(false);
+                showMessage('Template saved.', 'success');
+            } catch (err) {
+                showMessage('Unable to save template.', 'error');
+                setDirty(true);
+            }
+        }
+
+        async function exportTemplate() {
+            if (isDirty) {
+                showMessage('Save your changes before exporting.', 'warning');
+                return;
+            }
+            clearMessage();
+            try {
+                const res = await fetch(exportUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ output_mode: state.default_output_mode }),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    showMessage(data.message || 'Unable to export PDF.', 'error');
+                    return;
+                }
+                const warning = res.headers.get('X-Form-Creator-Warning');
+                if (warning) {
+                    showMessage(warning, 'warning');
+                }
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${state.name || 'form_template'}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (err) {
+                showMessage('Unable to export PDF.', 'error');
+            }
+        }
+
+        if (saveBtn) saveBtn.addEventListener('click', saveTemplate);
+        if (exportBtn) exportBtn.addEventListener('click', exportTemplate);
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+                tabs.forEach(btn => btn.classList.toggle('active', btn === tab));
+                if (layout) layout.dataset.activePanel = target;
+            });
+        });
+
+        function init() {
+            if (templateNameInput) templateNameInput.value = state.name;
+            if (templateOutputSelect) templateOutputSelect.value = state.default_output_mode;
+            if (pageSizeSelect) pageSizeSelect.value = state.page_size;
+            if (marginTopInput) marginTopInput.value = state.margins.top;
+            if (marginRightInput) marginRightInput.value = state.margins.right;
+            if (marginBottomInput) marginBottomInput.value = state.margins.bottom;
+            if (marginLeftInput) marginLeftInput.value = state.margins.left;
+            updatePageSize();
+            renderCanvas();
+            updateProperties();
+        }
+
+        init();
+    });
+</script>
+{% endblock %}

@@ -5,7 +5,7 @@ from .models import Purchase, ServiceUsage, UserProfile
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "date_of_birth", "created_at")
+    list_display = ("user", "date_of_birth", "can_use_advanced_tools", "created_at")
     search_fields = ("user__username", "user__email")
 
 

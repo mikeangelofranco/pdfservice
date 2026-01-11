@@ -13,18 +13,26 @@ from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from decimal import Decimal
 import json
 
 from PyPDF2 import PdfReader, PdfWriter
-from PyPDF2.generic import DecodedStreamObject, NameObject, ArrayObject
+from PyPDF2.generic import (
+    ArrayObject,
+    BooleanObject,
+    DecodedStreamObject,
+    DictionaryObject,
+    FloatObject,
+    NameObject,
+    NumberObject,
+    TextStringObject,
+)
 import pypdfium2 as pdfium
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import re
-from PIL import Image
 import zipfile
 import os
 
@@ -76,6 +84,280 @@ def _available_credits(user):
     return max(remaining, 0)
 
 
+ADVANCED_TOOL_SLUG = "pdf-form-creator"
+FORM_PAGE_WIDTH = 612
+FORM_PAGE_HEIGHT = 792
+FORM_MARGIN_X = 48
+FORM_MARGIN_TOP = 72
+FORM_MARGIN_BOTTOM = 56
+FORM_SECTION_TITLE_HEIGHT = 20
+FORM_LABEL_HEIGHT = 14
+FORM_FIELD_HEIGHT = 26
+FORM_FIELD_GAP = 16
+FORM_SECTION_GAP = 18
+FORM_COLUMN_GAP = 18
+
+
+def _can_use_advanced_tools(user):
+    if user.is_superuser:
+        return True
+    profile = getattr(user, "profile", None)
+    return bool(getattr(profile, "can_use_advanced_tools", False))
+
+
+def _normalize_form_template(raw_template):
+    if not isinstance(raw_template, dict):
+        raise ValueError("Template data is invalid.")
+
+    title = (raw_template.get("title") or "Untitled form").strip()
+    layout = (raw_template.get("layout") or "single").strip().lower()
+    if layout not in ("single", "two-column"):
+        layout = "single"
+
+    sections = []
+    for section in raw_template.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        sec_title = (section.get("title") or "").strip()
+        fields = []
+        for field in section.get("fields") or []:
+            if not isinstance(field, dict):
+                continue
+            label = (field.get("label") or "").strip()
+            ftype = (field.get("type") or "text").strip().lower()
+            if ftype not in ("text", "checkbox", "date", "signature"):
+                ftype = "text"
+            fields.append(
+                {
+                    "label": label or "Untitled field",
+                    "type": ftype,
+                }
+            )
+        if sec_title or fields:
+            if not fields:
+                fields.append({"label": "Untitled field", "type": "text"})
+            sections.append({"title": sec_title, "fields": fields})
+
+    if not sections:
+        raise ValueError("Add at least one section with fields.")
+
+    return {"title": title, "layout": layout, "sections": sections}
+
+
+def _layout_form(template, page_width, page_height):
+    placements = []
+    y = FORM_MARGIN_TOP
+    if template["layout"] == "two-column":
+        col_width = (page_width - (FORM_MARGIN_X * 2) - FORM_COLUMN_GAP) / 2
+    else:
+        col_width = page_width - (FORM_MARGIN_X * 2)
+
+    for section in template["sections"]:
+        sec_title = section.get("title")
+        if sec_title:
+            placements.append(
+                {
+                    "kind": "section",
+                    "title": sec_title,
+                    "x": FORM_MARGIN_X,
+                    "y": y,
+                }
+            )
+            y += FORM_SECTION_TITLE_HEIGHT
+
+        row_y = y
+        col = 0
+        for field in section["fields"]:
+            if template["layout"] == "two-column":
+                x = FORM_MARGIN_X + col * (col_width + FORM_COLUMN_GAP)
+                placements.append(
+                    {
+                        "kind": "field",
+                        "field": field,
+                        "x": x,
+                        "y": row_y,
+                        "width": col_width,
+                    }
+                )
+                col += 1
+                if col == 2:
+                    col = 0
+                    row_y += FORM_LABEL_HEIGHT + FORM_FIELD_HEIGHT + FORM_FIELD_GAP
+            else:
+                x = FORM_MARGIN_X
+                placements.append(
+                    {
+                        "kind": "field",
+                        "field": field,
+                        "x": x,
+                        "y": row_y,
+                        "width": col_width,
+                    }
+                )
+                row_y += FORM_LABEL_HEIGHT + FORM_FIELD_HEIGHT + FORM_FIELD_GAP
+
+        if template["layout"] == "two-column" and col != 0:
+            row_y += FORM_LABEL_HEIGHT + FORM_FIELD_HEIGHT + FORM_FIELD_GAP
+
+        y = row_y + FORM_SECTION_GAP
+
+        if y > page_height - FORM_MARGIN_BOTTOM:
+            raise ValueError("Template is too long for a single page.")
+
+    return placements
+
+
+def _render_form_background(template):
+    img = Image.new("RGB", (FORM_PAGE_WIDTH, FORM_PAGE_HEIGHT), "white")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+
+    title = template.get("title") or "Untitled form"
+    draw.text((FORM_MARGIN_X, 28), title, fill="black", font=font)
+
+    placements = _layout_form(template, FORM_PAGE_WIDTH, FORM_PAGE_HEIGHT)
+    field_specs = []
+    for item in placements:
+        if item["kind"] == "section":
+            draw.text((item["x"], item["y"]), item["title"], fill="black", font=font)
+            continue
+
+        field = item["field"]
+        label = field.get("label") or "Untitled field"
+        field_type = field.get("type") or "text"
+        draw.text((item["x"], item["y"]), label, fill="black", font=font)
+
+        input_y = item["y"] + FORM_LABEL_HEIGHT + 4
+        input_x = item["x"]
+        input_w = item["width"]
+        input_h = FORM_FIELD_HEIGHT
+
+        if field_type == "checkbox":
+            input_w = 16
+            input_h = 16
+            draw.rectangle(
+                (input_x, input_y, input_x + input_w, input_y + input_h),
+                outline="#222222",
+                width=1,
+            )
+        elif field_type == "signature":
+            line_y = input_y + input_h - 4
+            draw.line((input_x, line_y, input_x + input_w, line_y), fill="#222222", width=1)
+        else:
+            draw.rectangle(
+                (input_x, input_y, input_x + input_w, input_y + input_h),
+                outline="#222222",
+                width=1,
+            )
+
+        rect = [
+            float(input_x),
+            float(FORM_PAGE_HEIGHT - (input_y + input_h)),
+            float(input_x + input_w),
+            float(FORM_PAGE_HEIGHT - input_y),
+        ]
+        field_specs.append(
+            {
+                "name": label,
+                "type": field_type,
+                "rect": rect,
+            }
+        )
+
+    return img, field_specs
+
+
+def _add_form_fields(writer, page, fields):
+    annotations = page.get("/Annots")
+    if annotations is None:
+        annotations = ArrayObject()
+    elif not isinstance(annotations, ArrayObject):
+        annotations = ArrayObject(annotations)
+
+    field_array = ArrayObject()
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+
+    for idx, field in enumerate(fields, start=1):
+        safe_label = re.sub(r"[^A-Za-z0-9_]+", "_", field["name"]).strip("_")
+        field_name = safe_label or f"field_{idx}"
+        rect = ArrayObject([FloatObject(val) for val in field["rect"]])
+
+        if field["type"] == "checkbox":
+            annot = DictionaryObject(
+                {
+                    NameObject("/FT"): NameObject("/Btn"),
+                    NameObject("/Type"): NameObject("/Annot"),
+                    NameObject("/Subtype"): NameObject("/Widget"),
+                    NameObject("/T"): TextStringObject(field_name),
+                    NameObject("/Rect"): rect,
+                    NameObject("/V"): NameObject("/Off"),
+                    NameObject("/AS"): NameObject("/Off"),
+                    NameObject("/Ff"): NumberObject(0),
+                    NameObject("/F"): NumberObject(4),
+                    NameObject("/MK"): DictionaryObject({NameObject("/CA"): TextStringObject("X")}),
+                    NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g"),
+                }
+            )
+        else:
+            annot = DictionaryObject(
+                {
+                    NameObject("/FT"): NameObject("/Tx"),
+                    NameObject("/Type"): NameObject("/Annot"),
+                    NameObject("/Subtype"): NameObject("/Widget"),
+                    NameObject("/T"): TextStringObject(field_name),
+                    NameObject("/Rect"): rect,
+                    NameObject("/Ff"): NumberObject(0),
+                    NameObject("/V"): TextStringObject(""),
+                    NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g"),
+                }
+            )
+
+        annotations.append(annot)
+        field_array.append(annot)
+
+    page[NameObject("/Annots")] = annotations
+    form = DictionaryObject(
+        {
+            NameObject("/Fields"): field_array,
+            NameObject("/NeedAppearances"): BooleanObject(True),
+            NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g"),
+            NameObject("/DR"): DictionaryObject(
+                {
+                    NameObject("/Font"): DictionaryObject({NameObject("/Helv"): font_ref}),
+                }
+            ),
+        }
+    )
+    writer._root_object.update({NameObject("/AcroForm"): form})
+
+
+def _build_form_pdf(template, export_mode):
+    img, field_specs = _render_form_background(template)
+    base_buffer = BytesIO()
+    img.save(base_buffer, format="PDF")
+    base_buffer.seek(0)
+
+    if export_mode == "fillable":
+        reader = PdfReader(base_buffer)
+        writer = PdfWriter()
+        writer.append_pages_from_reader(reader)
+        if writer.pages and field_specs:
+            _add_form_fields(writer, writer.pages[0], field_specs)
+        output = BytesIO()
+        writer.write(output)
+        output.seek(0)
+        return output.read()
+
+    return base_buffer.read()
+
+
 @login_required
 def dashboard(request):
     tools = [
@@ -95,6 +377,89 @@ def dashboard(request):
         {
             "tools": tools,
             "credit_balance": balance,
+        },
+    )
+
+
+@login_required
+def form_creator(request):
+    if not _can_use_advanced_tools(request.user):
+        reason = (
+            "PDF Form Creator is an advanced tool. Ask your admin to enable advanced access "
+            "for your account."
+        )
+        return render(
+            request,
+            "advanced_tool_denied.html",
+            {"reason": reason, "credit_balance": _available_credits(request.user)},
+        )
+
+    balance = _available_credits(request.user)
+    if not request.user.is_superuser and balance <= 0:
+        messages.error(
+            request,
+            "Not enough credits to launch PDF Form Creator. Please top up.",
+        )
+        return redirect("dashboard")
+
+    if not request.user.is_superuser:
+        ServiceUsage.objects.create(user=request.user, tool_slug=ADVANCED_TOOL_SLUG)
+        balance = _available_credits(request.user)
+
+    return render(
+        request,
+        "form_creator.html",
+        {"credit_balance": balance},
+    )
+
+
+@login_required
+def form_creator_export(request):
+    if request.method != "POST":
+        return redirect("form_creator")
+
+    if not _can_use_advanced_tools(request.user):
+        reason = (
+            "PDF Form Creator is an advanced tool. Ask your admin to enable advanced access "
+            "for your account."
+        )
+        return render(
+            request,
+            "advanced_tool_denied.html",
+            {"reason": reason, "credit_balance": _available_credits(request.user)},
+        )
+
+    template_json = request.POST.get("template_json") or ""
+    export_mode = (request.POST.get("export_mode") or "flattened").strip().lower()
+    if export_mode not in ("flattened", "fillable"):
+        export_mode = "flattened"
+
+    try:
+        raw_template = json.loads(template_json or "{}")
+        template = _normalize_form_template(raw_template)
+        pdf_bytes = _build_form_pdf(template, export_mode)
+    except json.JSONDecodeError:
+        error = "Template data is invalid. Please rebuild the form and try again."
+    except ValueError as exc:
+        error = str(exc)
+    except Exception:
+        logger.exception("form_creator_export failed")
+        error = "Unable to generate PDF. Please review the template and try again."
+    else:
+        safe_title = re.sub(r"[^A-Za-z0-9_-]+", "_", template["title"]).strip("_") or "pdf_form"
+        filename = f"{safe_title}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    return render(
+        request,
+        "form_creator.html",
+        {
+            "credit_balance": _available_credits(request.user),
+            "form_error": error,
+            "template_json": template_json,
+            "export_mode": export_mode,
         },
     )
 

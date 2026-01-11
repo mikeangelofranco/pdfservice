@@ -22,5 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/logout/', page_views.logout_view, name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),
+    path('', include('form_creator.urls')),
     path('', include('pages.urls')),
 ]

@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Form Creator - PlugHub{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="section-head">
+        <h1>PDF Form Creator</h1>
+        <p>Design fillable forms and generate PDFs.</p>
+    </div>
+
+    {% if form_error %}
+    <div class="message-stack">
+        <div class="message error">{{ form_error }}</div>
+    </div>
+    {% endif %}
+
+    <form class="form-creator-shell" method="post" action="{% url 'form_creator_export' %}" data-form-creator data-initial-template="{{ template_json|default:''|escapejs }}">
+        {% csrf_token %}
+        <input type="hidden" name="template_json" data-template-json>
+
+        <div class="card creator-toolbar">
+            <div class="creator-row">
+                <div class="field-stack">
+                    <label class="field-label" for="template-title">Template name</label>
+                    <input id="template-title" type="text" placeholder="e.g. Client intake form" data-template-title>
+                </div>
+                <div class="field-stack">
+                    <label class="field-label" for="template-layout">Layout</label>
+                    <select id="template-layout" data-template-layout>
+                        <option value="single">Single column</option>
+                        <option value="two-column">Two column</option>
+                    </select>
+                </div>
+                <div class="field-stack">
+                    <label class="field-label">Export as</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="export_mode" value="flattened" {% if export_mode != 'fillable' %}checked{% endif %}> Flattened (default)</label>
+                        <label><input type="radio" name="export_mode" value="fillable" {% if export_mode == 'fillable' %}checked{% endif %}> Fillable (AcroForm)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-creator">
+            <div class="card builder-panel" data-form-builder>
+                <div class="builder-head">
+                    <div>
+                        <h3>Template builder</h3>
+                        <p>Define sections, fields, and layout in minutes.</p>
+                    </div>
+                    <button type="button" class="btn ghost small" data-add-section>Add section</button>
+                </div>
+                <div class="builder-body" data-section-list>
+                    <div class="builder-empty" data-builder-empty>No sections yet. Add one to start.</div>
+                </div>
+            </div>
+
+            <div class="card preview-panel">
+                <div class="preview-head">
+                    <h3>Live preview</h3>
+                    <span class="chip muted">Preview</span>
+                </div>
+                <div class="preview-canvas" data-form-preview></div>
+            </div>
+        </div>
+
+        <div class="creator-footer">
+            <button type="submit" class="btn primary">Generate PDF</button>
+            <div class="creator-note">Flattened by default. Fillable exports create AcroForm fields.</div>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('[data-form-creator]');
+        if (!form) return;
+
+        const titleInput = form.querySelector('[data-template-title]');
+        const layoutSelect = form.querySelector('[data-template-layout]');
+        const templateInput = form.querySelector('[data-template-json]');
+        const sectionList = form.querySelector('[data-section-list]');
+        const preview = form.querySelector('[data-form-preview]');
+        const addSectionBtn = form.querySelector('[data-add-section]');
+        const emptyState = form.querySelector('[data-builder-empty]');
+        const initialTemplateRaw = form.dataset.initialTemplate || '';
+
+        const fieldTypes = [
+            { value: 'text', label: 'Text' },
+            { value: 'checkbox', label: 'Checkbox' },
+            { value: 'date', label: 'Date' },
+            { value: 'signature', label: 'Signature' },
+        ];
+
+        function createFieldRow(field = {}) {
+            const row = document.createElement('div');
+            row.className = 'field-row';
+            row.dataset.field = 'true';
+            row.innerHTML = `
+                <input type="text" placeholder="Field label" data-field-label>
+                <select data-field-type></select>
+                <button type="button" class="btn ghost small" data-remove-field>Remove</button>
+            `;
+            const labelInput = row.querySelector('[data-field-label]');
+            if (labelInput) {
+                labelInput.value = field.label || '';
+            }
+            const select = row.querySelector('[data-field-type]');
+            fieldTypes.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                select.appendChild(option);
+            });
+            select.value = field.type || 'text';
+            return row;
+        }
+
+        function createSectionCard(section = {}) {
+            const card = document.createElement('div');
+            card.className = 'section-card';
+            card.dataset.section = 'true';
+            card.innerHTML = `
+                <div class="section-card-head">
+                    <div class="field-stack">
+                        <label class="field-label">Section title</label>
+                        <input type="text" placeholder="e.g. Personal details" data-section-title>
+                    </div>
+                    <div class="section-actions">
+                        <button type="button" class="btn ghost small" data-add-field>Add field</button>
+                        <button type="button" class="btn ghost small" data-remove-section>Remove</button>
+                    </div>
+                </div>
+                <div class="section-fields" data-section-fields></div>
+                <div class="section-empty" data-section-empty>No fields yet. Add one.</div>
+            `;
+            const sectionTitleInput = card.querySelector('[data-section-title]');
+            if (sectionTitleInput) {
+                sectionTitleInput.value = section.title || '';
+            }
+            const fieldsWrap = card.querySelector('[data-section-fields]');
+            const fields = section.fields || [];
+            if (fields.length) {
+                fields.forEach(field => fieldsWrap.appendChild(createFieldRow(field)));
+            }
+            return card;
+        }
+
+        function collectState() {
+            const state = {
+                title: titleInput ? titleInput.value.trim() : 'Untitled form',
+                layout: layoutSelect ? layoutSelect.value : 'single',
+                sections: [],
+            };
+            const sections = sectionList.querySelectorAll('[data-section]');
+            sections.forEach(sectionEl => {
+                const sectionTitle = sectionEl.querySelector('[data-section-title]');
+                const fields = [];
+                sectionEl.querySelectorAll('[data-field]').forEach(fieldEl => {
+                    const label = fieldEl.querySelector('[data-field-label]');
+                    const type = fieldEl.querySelector('[data-field-type]');
+                    fields.push({
+                        label: label ? label.value.trim() : '',
+                        type: type ? type.value : 'text',
+                    });
+                });
+                state.sections.push({
+                    title: sectionTitle ? sectionTitle.value.trim() : '',
+                    fields: fields,
+                });
+            });
+            return state;
+        }
+
+        function renderPreview(state) {
+            if (!preview) return;
+            preview.innerHTML = '';
+            const sheet = document.createElement('div');
+            sheet.className = 'preview-sheet';
+
+            const title = document.createElement('div');
+            title.className = 'preview-title';
+            title.textContent = state.title || 'Untitled form';
+            sheet.appendChild(title);
+
+            if (!state.sections.length) {
+                const empty = document.createElement('div');
+                empty.className = 'preview-empty';
+                empty.textContent = 'Add sections and fields to preview your form.';
+                sheet.appendChild(empty);
+                preview.appendChild(sheet);
+                return;
+            }
+
+            state.sections.forEach(section => {
+                const sectionWrap = document.createElement('div');
+                sectionWrap.className = 'preview-section';
+
+                if (section.title) {
+                    const sectionTitle = document.createElement('div');
+                    sectionTitle.className = 'preview-section-title';
+                    sectionTitle.textContent = section.title;
+                    sectionWrap.appendChild(sectionTitle);
+                }
+
+                const fieldsWrap = document.createElement('div');
+                fieldsWrap.className = state.layout === 'two-column' ? 'preview-fields preview-fields--two' : 'preview-fields';
+                section.fields.forEach(field => {
+                    const fieldEl = document.createElement('div');
+                    fieldEl.className = 'preview-field';
+
+                    const labelEl = document.createElement('div');
+                    labelEl.className = 'preview-label';
+                    labelEl.textContent = field.label || 'Untitled field';
+                    fieldEl.appendChild(labelEl);
+
+                    const inputEl = document.createElement('div');
+                    if (field.type === 'checkbox') {
+                        inputEl.className = 'preview-input preview-input--checkbox';
+                    } else if (field.type === 'signature') {
+                        inputEl.className = 'preview-input preview-input--signature';
+                    } else {
+                        inputEl.className = 'preview-input';
+                    }
+                    fieldEl.appendChild(inputEl);
+                    fieldsWrap.appendChild(fieldEl);
+                });
+                sectionWrap.appendChild(fieldsWrap);
+                sheet.appendChild(sectionWrap);
+            });
+
+            preview.appendChild(sheet);
+        }
+
+        function syncEmptyStates() {
+            if (!emptyState) return;
+            const hasSections = sectionList.querySelectorAll('[data-section]').length > 0;
+            emptyState.hidden = hasSections;
+            sectionList.querySelectorAll('[data-section]').forEach(section => {
+                const empty = section.querySelector('[data-section-empty]');
+                const hasFields = section.querySelectorAll('[data-field]').length > 0;
+                if (empty) empty.hidden = hasFields;
+            });
+        }
+
+        function syncState() {
+            const state = collectState();
+            if (templateInput) {
+                templateInput.value = JSON.stringify(state);
+            }
+            renderPreview(state);
+            syncEmptyStates();
+        }
+
+        function addSection(section = {}) {
+            const card = createSectionCard(section);
+            sectionList.appendChild(card);
+            syncEmptyStates();
+            syncState();
+        }
+
+        function addField(sectionEl, field = {}) {
+            const fieldsWrap = sectionEl.querySelector('[data-section-fields]');
+            if (!fieldsWrap) return;
+            fieldsWrap.appendChild(createFieldRow(field));
+            syncState();
+        }
+
+        sectionList.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!target) return;
+            if (target.matches('[data-add-field]')) {
+                const section = target.closest('[data-section]');
+                if (section) addField(section);
+            }
+            if (target.matches('[data-remove-section]')) {
+                const section = target.closest('[data-section]');
+                if (section) section.remove();
+                syncState();
+            }
+            if (target.matches('[data-remove-field]')) {
+                const field = target.closest('[data-field]');
+                if (field) field.remove();
+                syncState();
+            }
+        });
+
+        form.addEventListener('input', syncState);
+        form.addEventListener('change', syncState);
+        if (addSectionBtn) {
+            addSectionBtn.addEventListener('click', () => addSection());
+        }
+
+        form.addEventListener('submit', (event) => {
+            const state = collectState();
+            const hasFields = state.sections.some(section => section.fields.length);
+            if (!hasFields) {
+                event.preventDefault();
+                alert('Add at least one field before generating a PDF.');
+                return;
+            }
+            if (templateInput) {
+                templateInput.value = JSON.stringify(state);
+            }
+        });
+
+        let initialTemplate = null;
+        if (initialTemplateRaw) {
+            try {
+                initialTemplate = JSON.parse(initialTemplateRaw);
+            } catch (err) {
+                initialTemplate = null;
+            }
+        }
+
+        if (initialTemplate && initialTemplate.sections) {
+            if (titleInput) titleInput.value = initialTemplate.title || '';
+            if (layoutSelect) layoutSelect.value = initialTemplate.layout || 'single';
+            initialTemplate.sections.forEach(section => addSection(section));
+        } else {
+            addSection({
+                title: 'Basics',
+                fields: [
+                    { label: 'Full name', type: 'text' },
+                ],
+            });
+        }
+    });
+</script>
+{% endblock %}

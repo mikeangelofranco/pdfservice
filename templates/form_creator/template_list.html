@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Form Creator - PlugHub{% endblock %}
+
+{% block content %}
+<section class="section form-creator-page">
+    <div class="section-head">
+        <div class="form-creator-head">
+            <div>
+                <span class="advanced-tag">ADVANCED</span>
+                <h1>PDF Form Creator</h1>
+                <p>Manage your templates and launch the builder.</p>
+            </div>
+            <div class="form-creator-actions">
+                <a class="btn primary" href="{% url 'form_creator_new' %}">Create New Template</a>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="message-stack">
+        {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="template-list">
+        {% if templates %}
+            {% for template in templates %}
+            <div class="card template-card">
+                <div class="template-card-head">
+                    <div>
+                        <div class="card-title">{{ template.name }}</div>
+                        <div class="template-meta">
+                            Updated {{ template.updated_at|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                    <div class="chip muted">Fields: {{ template.field_count }}</div>
+                </div>
+                <div class="template-card-meta">
+                    <span class="template-mode">
+                        Default output:
+                        {% if template.default_output_mode == "FILLABLE" %}
+                            Fillable
+                        {% else %}
+                            Flattened
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="template-card-actions">
+                    <a class="btn ghost small" href="{% url 'form_creator_edit' template.id %}">Edit</a>
+                    <form method="post" action="{% url 'form_creator_duplicate' template.id %}">
+                        {% csrf_token %}
+                        <button class="btn ghost small" type="submit">Duplicate</button>
+                    </form>
+                    <form method="post" action="{% url 'form_creator_delete' template.id %}" data-delete-form>
+                        {% csrf_token %}
+                        <button class="btn ghost small danger" type="submit">Delete</button>
+                    </form>
+                    <form method="post" action="{% url 'form_creator_export' template.id %}">
+                        {% csrf_token %}
+                        <select name="output_mode">
+                            <option value="FLATTENED" {% if template.default_output_mode != "FILLABLE" %}selected{% endif %}>Flattened</option>
+                            <option value="FILLABLE" {% if template.default_output_mode == "FILLABLE" %}selected{% endif %}>Fillable</option>
+                        </select>
+                        <button class="btn secondary small" type="submit">Export PDF</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="card empty-card">
+                <h3>No templates yet</h3>
+                <p>Create your first template to start building forms.</p>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<div class="modal-backdrop" data-delete-backdrop hidden>
+    <div class="modal">
+        <div class="modal-head">
+            <div>
+                <div class="pill small">DEL</div>
+                <h3>Delete template?</h3>
+                <p class="modal-description">This hides the template from your list. You can no longer edit it.</p>
+            </div>
+            <button class="close-btn" type="button" data-delete-cancel aria-label="Close modal">x</button>
+        </div>
+        <div class="modal-actions">
+            <button class="btn ghost" type="button" data-delete-cancel>Cancel</button>
+            <button class="btn primary" type="button" data-delete-confirm>Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const backdrop = document.querySelector('[data-delete-backdrop]');
+        const confirmBtn = document.querySelector('[data-delete-confirm]');
+        const cancelBtns = document.querySelectorAll('[data-delete-cancel]');
+        let pendingForm = null;
+
+        function openModal(form) {
+            pendingForm = form;
+            if (backdrop) backdrop.hidden = false;
+        }
+
+        function closeModal() {
+            pendingForm = null;
+            if (backdrop) backdrop.hidden = true;
+        }
+
+        document.querySelectorAll('[data-delete-form]').forEach(form => {
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                openModal(form);
+            });
+        });
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                if (pendingForm) pendingForm.submit();
+                closeModal();
+            });
+        }
+
+        cancelBtns.forEach(btn => {
+            btn.addEventListener('click', closeModal);
+        });
+    });
+</script>
+{% endblock %}

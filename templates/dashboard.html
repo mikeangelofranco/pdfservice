@@ -59,6 +59,20 @@
             </div>
         </button>
         {% endfor %}
+        <a
+            class="card action-card tool-card tool-card--advanced"
+            href="{% url 'form_creator' %}"
+        >
+            <span class="tool-advanced-badge">ADVANCED</span>
+            <div>
+                <div class="pill small">ADV</div>
+                <div class="tool-header">
+                    <span class="tool-icon icon-form"></span>
+                    <span class="card-title">PDF Form Creator</span>
+                </div>
+                <p>Design fillable forms and generate PDFs.</p>
+            </div>
+        </a>
     </div>
 </section>
 
@@ -999,7 +1013,7 @@
             });
         }
 
-        document.querySelectorAll('.tool-card').forEach(btn => {
+        document.querySelectorAll('.tool-card:not(.tool-card--advanced)').forEach(btn => {
             btn.addEventListener('click', () => openModal(btn));
         });
 

@@ -9,6 +9,7 @@ class UserProfile(models.Model):
         related_name="profile",
     )
     date_of_birth = models.DateField()
+    can_use_advanced_tools = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

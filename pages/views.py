@@ -2,6 +2,7 @@ import base64
 from io import BytesIO
 import tempfile
 import logging
+import math
 
 from django.contrib import messages
 from django.contrib.auth import login, logout
@@ -23,6 +24,7 @@ from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import (
     ArrayObject,
     BooleanObject,
+    ContentStream,
     DecodedStreamObject,
     DictionaryObject,
     FloatObject,
@@ -273,6 +275,7 @@ def _add_form_fields(writer, page, fields):
         annotations = ArrayObject()
     elif not isinstance(annotations, ArrayObject):
         annotations = ArrayObject(annotations)
+    page_ref = getattr(page, "indirect_ref", None)
 
     field_array = ArrayObject()
     font = DictionaryObject(
@@ -283,6 +286,67 @@ def _add_form_fields(writer, page, fields):
         }
     )
     font_ref = writer._add_object(font)
+    zapf_font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/ZapfDingbats"),
+        }
+    )
+    zapf_ref = writer._add_object(zapf_font)
+    dr = DictionaryObject(
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/Helv"): font_ref, NameObject("/ZaDb"): zapf_ref}
+            ),
+        }
+    )
+
+    def make_empty_appearance(width, height, font_resource=None):
+        stream = DecodedStreamObject()
+        stream.set_data(b"")
+        resources = DictionaryObject()
+        if font_resource is not None:
+            resources[NameObject("/Font")] = font_resource
+        stream.update(
+            {
+                NameObject("/Type"): NameObject("/XObject"),
+                NameObject("/Subtype"): NameObject("/Form"),
+                NameObject("/BBox"): ArrayObject(
+                    [FloatObject(0), FloatObject(0), FloatObject(width), FloatObject(height)]
+                ),
+                NameObject("/Resources"): resources,
+            }
+        )
+        return writer._add_object(stream)
+
+    def make_checkbox_appearance(width, height):
+        size = max(6.0, min(width, height) * 0.8)
+        tx = max(0.5, (width - size) / 2)
+        ty = max(0.5, (height - size) / 2)
+        stream = DecodedStreamObject()
+        commands = (
+            f"BT /ZaDb {size:.2f} Tf 0 0 0 rg "
+            f"1 0 0 1 {tx:.2f} {ty:.2f} Tm (4) Tj ET"
+        )
+        stream.set_data(commands.encode("ascii"))
+        stream.update(
+            {
+                NameObject("/Type"): NameObject("/XObject"),
+                NameObject("/Subtype"): NameObject("/Form"),
+                NameObject("/BBox"): ArrayObject(
+                    [FloatObject(0), FloatObject(0), FloatObject(width), FloatObject(height)]
+                ),
+                NameObject("/Resources"): DictionaryObject(
+                    {
+                        NameObject("/Font"): DictionaryObject(
+                            {NameObject("/ZaDb"): zapf_ref}
+                        )
+                    }
+                ),
+            }
+        )
+        return writer._add_object(stream)
 
     for idx, field in enumerate(fields, start=1):
         safe_label = re.sub(r"[^A-Za-z0-9_]+", "_", field["name"]).strip("_")
@@ -290,53 +354,1262 @@ def _add_form_fields(writer, page, fields):
         rect = ArrayObject([FloatObject(val) for val in field["rect"]])
 
         if field["type"] == "checkbox":
+            rect_w = rect[2] - rect[0]
+            rect_h = rect[3] - rect[1]
+            on_ref = make_checkbox_appearance(rect_w, rect_h)
+            off_ref = make_empty_appearance(
+                rect_w, rect_h, DictionaryObject({NameObject("/ZaDb"): zapf_ref})
+            )
+            widget = DictionaryObject(
+                {
+                    NameObject("/Type"): NameObject("/Annot"),
+                    NameObject("/Subtype"): NameObject("/Widget"),
+                    NameObject("/Rect"): rect,
+                    NameObject("/AS"): NameObject("/Off"),
+                    NameObject("/F"): NumberObject(4),
+                    NameObject("/MK"): DictionaryObject({NameObject("/CA"): TextStringObject("4")}),
+                    NameObject("/DA"): TextStringObject("/ZaDb 12 Tf 0 g"),
+                    NameObject("/DR"): dr,
+                    NameObject("/AP"): DictionaryObject(
+                        {
+                            NameObject("/N"): DictionaryObject(
+                                {
+                                    NameObject("/Yes"): on_ref,
+                                    NameObject("/Off"): off_ref,
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+            if page_ref is not None:
+                widget[NameObject("/P")] = page_ref
+            widget_ref = writer._add_object(widget)
             annot = DictionaryObject(
                 {
                     NameObject("/FT"): NameObject("/Btn"),
-                    NameObject("/Type"): NameObject("/Annot"),
-                    NameObject("/Subtype"): NameObject("/Widget"),
                     NameObject("/T"): TextStringObject(field_name),
-                    NameObject("/Rect"): rect,
                     NameObject("/V"): NameObject("/Off"),
-                    NameObject("/AS"): NameObject("/Off"),
                     NameObject("/Ff"): NumberObject(0),
-                    NameObject("/F"): NumberObject(4),
-                    NameObject("/MK"): DictionaryObject({NameObject("/CA"): TextStringObject("X")}),
-                    NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g"),
+                    NameObject("/DA"): TextStringObject("/ZaDb 12 Tf 0 g"),
+                    NameObject("/Kids"): ArrayObject([widget_ref]),
                 }
             )
         else:
+            widget = DictionaryObject(
+                {
+                    NameObject("/Type"): NameObject("/Annot"),
+                    NameObject("/Subtype"): NameObject("/Widget"),
+                    NameObject("/Rect"): rect,
+                    NameObject("/F"): NumberObject(4),
+                    NameObject("/DA"): TextStringObject("/Helv 12 Tf 0 g"),
+                    NameObject("/DR"): dr,
+                }
+            )
+            if page_ref is not None:
+                widget[NameObject("/P")] = page_ref
+            widget_ref = writer._add_object(widget)
             annot = DictionaryObject(
                 {
                     NameObject("/FT"): NameObject("/Tx"),
-                    NameObject("/Type"): NameObject("/Annot"),
-                    NameObject("/Subtype"): NameObject("/Widget"),
                     NameObject("/T"): TextStringObject(field_name),
-                    NameObject("/Rect"): rect,
-                    NameObject("/Ff"): NumberObject(0),
                     NameObject("/V"): TextStringObject(""),
-                    NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g"),
+                    NameObject("/Ff"): NumberObject(0),
+                    NameObject("/DA"): TextStringObject("/Helv 12 Tf 0 g"),
+                    NameObject("/Kids"): ArrayObject([widget_ref]),
                 }
             )
 
-        annotations.append(annot)
-        field_array.append(annot)
+        annot_ref = writer._add_object(annot)
+        widget[NameObject("/Parent")] = annot_ref
+        annotations.append(widget_ref)
+        field_array.append(annot_ref)
 
     page[NameObject("/Annots")] = annotations
     form = DictionaryObject(
         {
             NameObject("/Fields"): field_array,
             NameObject("/NeedAppearances"): BooleanObject(True),
-            NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g"),
+            NameObject("/DA"): TextStringObject("/Helv 12 Tf 0 g"),
             NameObject("/DR"): DictionaryObject(
                 {
-                    NameObject("/Font"): DictionaryObject({NameObject("/Helv"): font_ref}),
+                    NameObject("/Font"): DictionaryObject(
+                        {NameObject("/Helv"): font_ref, NameObject("/ZaDb"): zapf_ref}
+                    ),
                 }
             ),
         }
     )
     writer._root_object.update({NameObject("/AcroForm"): form})
 
+
+def _resolve_annotations(page):
+    annotations = page.get("/Annots")
+    if annotations is None:
+        return None
+    if hasattr(annotations, "get_object"):
+        annotations = annotations.get_object()
+    if not isinstance(annotations, ArrayObject):
+        annotations = ArrayObject(annotations)
+    page[NameObject("/Annots")] = annotations
+    return annotations
+
+
+def _collect_widget_fields(pages):
+    widgets = []
+    name_index = 1
+    for page in pages:
+        annotations = _resolve_annotations(page)
+        if not annotations:
+            continue
+        for annot in annotations:
+            try:
+                annot_obj = annot.get_object()
+            except Exception:
+                annot_obj = annot
+            if annot_obj.get("/Subtype") != NameObject("/Widget"):
+                continue
+            if annot_obj.get("/Rect") is None:
+                continue
+            if annot_obj.get("/T") is None:
+                annot_obj[NameObject("/T")] = TextStringObject(f"field_{name_index}")
+                name_index += 1
+            if annot_obj.get("/FT") is None:
+                annot_obj[NameObject("/FT")] = NameObject("/Tx")
+            widgets.append(annot)
+    return widgets
+
+
+def _build_acroform(writer, fields):
+    field_array = ArrayObject(fields)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+    zapf_font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/ZapfDingbats"),
+        }
+    )
+    zapf_ref = writer._add_object(zapf_font)
+    form = DictionaryObject(
+        {
+            NameObject("/Fields"): field_array,
+            NameObject("/NeedAppearances"): BooleanObject(True),
+            NameObject("/DA"): TextStringObject("/Helv 12 Tf 0 g"),
+            NameObject("/DR"): DictionaryObject(
+                {
+                    NameObject("/Font"): DictionaryObject(
+                        {NameObject("/Helv"): font_ref, NameObject("/ZaDb"): zapf_ref}
+                    ),
+                }
+            ),
+        }
+    )
+    writer._root_object.update({NameObject("/AcroForm"): form})
+
+
+def _add_full_page_text_fields(writer):
+    fields = []
+    for idx, page in enumerate(writer.pages, start=1):
+        annotations = page.get("/Annots")
+        if annotations is None:
+            annotations = ArrayObject()
+        elif hasattr(annotations, "get_object"):
+            annotations = annotations.get_object()
+        if not isinstance(annotations, ArrayObject):
+            annotations = ArrayObject(annotations)
+        page[NameObject("/Annots")] = annotations
+
+        box = page.mediabox
+        left = float(box.left) + 36
+        bottom = float(box.bottom) + 36
+        right = float(box.right) - 36
+        top = float(box.top) - 36
+        if right <= left or top <= bottom:
+            left = float(box.left)
+            bottom = float(box.bottom)
+            right = float(box.right)
+            top = float(box.top)
+
+        rect = ArrayObject(
+            [
+                FloatObject(left),
+                FloatObject(bottom),
+                FloatObject(right),
+                FloatObject(top),
+            ]
+        )
+        annot = DictionaryObject(
+            {
+                NameObject("/FT"): NameObject("/Tx"),
+                NameObject("/Type"): NameObject("/Annot"),
+                NameObject("/Subtype"): NameObject("/Widget"),
+                NameObject("/T"): TextStringObject(f"page_{idx}_content"),
+                NameObject("/Rect"): rect,
+                NameObject("/Ff"): NumberObject(4096),
+                NameObject("/Q"): NumberObject(0),
+                NameObject("/Border"): ArrayObject([NumberObject(0), NumberObject(0), NumberObject(0)]),
+                NameObject("/DA"): TextStringObject("/Helv 12 Tf 0 g"),
+            }
+        )
+        annotations.append(annot)
+        fields.append(annot)
+    _build_acroform(writer, fields)
+
+
+def _matrix_multiply(m1, m2):
+    a1, b1, c1, d1, e1, f1 = m1
+    a2, b2, c2, d2, e2, f2 = m2
+    return [
+        a1 * a2 + b1 * c2,
+        a1 * b2 + b1 * d2,
+        c1 * a2 + d1 * c2,
+        c1 * b2 + d1 * d2,
+        e1 * a2 + f1 * c2 + e2,
+        e1 * b2 + f1 * d2 + f2,
+    ]
+
+
+def _transform_point(ctm, x, y):
+    a, b, c, d, e, f = ctm
+    return (a * x + c * y + e, b * x + d * y + f)
+
+
+def _bbox_from_points(points):
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return [min(xs), min(ys), max(xs), max(ys)]
+
+
+def _page_bounds(page):
+    box = page.cropbox if page.cropbox is not None else page.mediabox
+    return (
+        float(box.left),
+        float(box.bottom),
+        float(box.right),
+        float(box.top),
+    )
+
+
+def _clamp_rect(rect, page):
+    left, bottom, right, top = _page_bounds(page)
+    x1, y1, x2, y2 = rect
+    x1 = max(left, min(x1, right))
+    x2 = max(left, min(x2, right))
+    y1 = max(bottom, min(y1, top))
+    y2 = max(bottom, min(y2, top))
+    if x2 < x1:
+        x1, x2 = x2, x1
+    if y2 < y1:
+        y1, y2 = y2, y1
+    return [x1, y1, x2, y2]
+
+
+def _dedupe_field_specs(fields):
+    seen = set()
+    unique = []
+    for field in fields:
+        rect = field["rect"]
+        key = (
+            field["type"],
+            bool(field.get("multiline")),
+            round(rect[0], 1),
+            round(rect[1], 1),
+            round(rect[2], 1),
+            round(rect[3], 1),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(field)
+    return unique
+
+
+def _rects_intersect(rect_a, rect_b):
+    return not (
+        rect_a[2] <= rect_b[0]
+        or rect_a[0] >= rect_b[2]
+        or rect_a[3] <= rect_b[1]
+        or rect_a[1] >= rect_b[3]
+    )
+
+
+def _remove_text_overlaps(fields):
+    boxes = [
+        field["rect"]
+        for field in fields
+        if field.get("type") in ("checkbox", "radio")
+    ]
+    if not boxes:
+        return fields
+    filtered = []
+    for field in fields:
+        if field.get("type") != "text":
+            filtered.append(field)
+            continue
+        if any(_rects_intersect(field["rect"], box) for box in boxes):
+            continue
+        filtered.append(field)
+    return filtered
+
+
+def _matrix_scale(ctm):
+    return math.sqrt(abs((ctm[0] * ctm[3]) - (ctm[1] * ctm[2]))) or 1.0
+
+
+def _extract_drawn_fields(reader, page):
+    contents = page.get_contents()
+    if not contents:
+        return []
+    try:
+        stream = ContentStream(contents, reader)
+    except Exception:
+        return []
+
+    left, bottom, right, top = _page_bounds(page)
+    page_width = right - left
+    min_line_len = max(10.0, page_width * 0.02)
+    max_line_thickness = 4.0
+    min_box = 8.0
+    max_box = 26.0
+    text_height = 14.0
+    max_text_box_height = 32.0
+
+    fields = []
+    line_segments = []
+    vertical_segments = []
+
+    def add_text_field_from_line(bbox, stroke_width):
+        x1, y1, x2, y2 = bbox
+        line_y = max(y1, y2)
+        height = max(12.0, min(16.0, text_height))
+        rect = [x1, line_y, x2, line_y + height]
+        rect = _clamp_rect(rect, page)
+        if rect[2] - rect[0] < 6:
+            return
+        fields.append({"type": "text", "rect": rect, "multiline": False})
+
+    def add_line_segment(x1, y1, x2, y2, stroke_width):
+        if abs(y2 - y1) > max_line_thickness:
+            return
+        length = math.hypot(x2 - x1, y2 - y1)
+        if length < min_line_len:
+            return
+        y_mid = (y1 + y2) / 2.0
+        if y_mid <= bottom + 2 or y_mid >= top - 2:
+            return
+        line_segments.append(
+            {
+                "x1": min(x1, x2),
+                "x2": max(x1, x2),
+                "y": y_mid,
+                "stroke": stroke_width,
+                "length": length,
+            }
+        )
+
+    def add_vertical_segment(x1, y1, x2, y2, stroke_width):
+        if abs(x2 - x1) > max_line_thickness:
+            return
+        length = math.hypot(x2 - x1, y2 - y1)
+        if length < min_box:
+            return
+        x_mid = (x1 + x2) / 2.0
+        if x_mid <= left + 2 or x_mid >= right - 2:
+            return
+        vertical_segments.append(
+            {
+                "x": x_mid,
+                "y1": min(y1, y2),
+                "y2": max(y1, y2),
+                "stroke": stroke_width,
+                "length": length,
+            }
+        )
+
+    def add_text_field_from_box(bbox, stroke_width):
+        x1, y1, x2, y2 = bbox
+        inset = max(1.5, stroke_width * 1.2)
+        rect = [x1 + inset, y1 + inset, x2 - inset, y2 - inset]
+        rect = _clamp_rect(rect, page)
+        width = rect[2] - rect[0]
+        height = rect[3] - rect[1]
+        if width < 10 or height < 8:
+            return
+        fields.append({"type": "text", "rect": rect, "multiline": height >= 24})
+
+    def add_checkbox(bbox):
+        rect = _clamp_rect(bbox, page)
+        fields.append({"type": "checkbox", "rect": rect})
+
+    def add_radio(bbox):
+        rect = _clamp_rect(bbox, page)
+        fields.append({"type": "radio", "rect": rect})
+
+    def classify_path(path_segments):
+        if not path_segments:
+            return
+        stroke_width = max(seg.get("line_width", 1.0) for seg in path_segments)
+        has_curve = any(seg["kind"] == "curve" for seg in path_segments)
+        has_rect_line = any(seg["kind"] in ("rect", "line") for seg in path_segments)
+        if has_curve and not has_rect_line:
+            points = []
+            for seg in path_segments:
+                points.extend(seg["points"])
+            bbox = _bbox_from_points(points)
+            width = bbox[2] - bbox[0]
+            height = bbox[3] - bbox[1]
+            ratio = width / height if height else 0
+            if (
+                min_box <= width <= max_box
+                and min_box <= height <= max_box
+                and 0.8 <= ratio <= 1.25
+            ):
+                add_radio(bbox)
+            return
+
+        if path_segments and all(seg["kind"] == "line" for seg in path_segments):
+            points = []
+            axis_aligned = True
+            for seg in path_segments:
+                x1, y1, x2, y2 = seg["points"]
+                points.extend([(x1, y1), (x2, y2)])
+                if abs(x2 - x1) > max_line_thickness and abs(y2 - y1) > max_line_thickness:
+                    axis_aligned = False
+            bbox = _bbox_from_points(points)
+            width = bbox[2] - bbox[0]
+            height = bbox[3] - bbox[1]
+            ratio = width / height if height else 0
+            if (
+                min_box <= width <= max_box
+                and min_box <= height <= max_box
+                and 0.8 <= ratio <= 1.25
+                and len(path_segments) >= 3
+            ):
+                add_checkbox(bbox)
+                return
+
+        for seg in path_segments:
+            if seg["kind"] == "rect":
+                bbox = seg["bbox"]
+                width = bbox[2] - bbox[0]
+                height = bbox[3] - bbox[1]
+                if width <= 0 or height <= 0:
+                    continue
+                if height <= max_line_thickness and width >= min_line_len:
+                    add_line_segment(bbox[0], bbox[1], bbox[2], bbox[3], stroke_width)
+                    continue
+                if (
+                    min_box <= width <= max_box
+                    and min_box <= height <= max_box
+                    and 0.8 <= (width / height) <= 1.25
+                ):
+                    add_checkbox(bbox)
+                    continue
+                add_line_segment(bbox[0], bbox[1], bbox[2], bbox[1], stroke_width)
+                add_line_segment(bbox[0], bbox[3], bbox[2], bbox[3], stroke_width)
+                add_vertical_segment(bbox[0], bbox[1], bbox[0], bbox[3], stroke_width)
+                add_vertical_segment(bbox[2], bbox[1], bbox[2], bbox[3], stroke_width)
+            elif seg["kind"] == "line":
+                x1, y1, x2, y2 = seg["points"]
+                if abs(y2 - y1) > max_line_thickness:
+                    if abs(x2 - x1) <= max_line_thickness:
+                        add_vertical_segment(x1, y1, x2, y2, stroke_width)
+                    continue
+                add_line_segment(x1, y1, x2, y2, stroke_width)
+
+    paint_ops = {b"S", b"s", b"B", b"B*", b"b", b"b*"}
+    reset_ops = {b"n"}
+
+    def parse_stream(content_stream, resources, start_ctm=None, start_line_width=1.0, depth=0):
+        if depth > 8:
+            return
+        ctm = start_ctm[:] if start_ctm else [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+        state_stack = []
+        line_width = start_line_width
+        current_point = None
+        subpaths = []
+        current_path = []
+
+        def record_line_width():
+            return line_width * _matrix_scale(ctm)
+
+        for operands, operator in content_stream.operations:
+            if operator == b"q":
+                state_stack.append((ctm[:], line_width, current_point, current_path[:], list(subpaths)))
+                current_point = None
+                current_path = []
+                subpaths = []
+                continue
+            if operator == b"Q":
+                if state_stack:
+                    ctm, line_width, current_point, current_path, subpaths = state_stack.pop()
+                else:
+                    ctm = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+                    line_width = 1.0
+                    current_point = None
+                    current_path = []
+                    subpaths = []
+                continue
+            if operator == b"cm":
+                try:
+                    m = [float(val) for val in operands]
+                    if len(m) == 6:
+                        ctm = _matrix_multiply(ctm, m)
+                except Exception:
+                    pass
+                continue
+            if operator == b"w":
+                try:
+                    line_width = float(operands[0])
+                except Exception:
+                    line_width = 1.0
+                continue
+            if operator == b"Do":
+                if not resources:
+                    continue
+                xobjects = resources.get("/XObject") if hasattr(resources, "get") else None
+                if not xobjects:
+                    continue
+                if hasattr(xobjects, "get_object"):
+                    xobjects = xobjects.get_object()
+                name = operands[0]
+                xobj = xobjects.get(name) if hasattr(xobjects, "get") else None
+                if not xobj:
+                    continue
+                try:
+                    xobj = xobj.get_object()
+                except Exception:
+                    pass
+                if not isinstance(xobj, DictionaryObject):
+                    continue
+                if xobj.get("/Subtype") != NameObject("/Form"):
+                    continue
+                try:
+                    x_stream = ContentStream(xobj, reader)
+                except Exception:
+                    continue
+                x_resources = xobj.get("/Resources") or resources
+                if hasattr(x_resources, "get_object"):
+                    x_resources = x_resources.get_object()
+                x_ctm = ctm
+                matrix = xobj.get("/Matrix")
+                if matrix and len(matrix) == 6:
+                    try:
+                        m = [float(val) for val in matrix]
+                        x_ctm = _matrix_multiply(ctm, m)
+                    except Exception:
+                        x_ctm = ctm
+                parse_stream(x_stream, x_resources, x_ctm, line_width, depth + 1)
+                continue
+            if operator == b"m":
+                if current_path:
+                    subpaths.append(current_path)
+                    current_path = []
+                try:
+                    x, y = float(operands[0]), float(operands[1])
+                    current_point = _transform_point(ctm, x, y)
+                except Exception:
+                    current_point = None
+                continue
+            if operator == b"l":
+                if current_point is None:
+                    continue
+                try:
+                    x, y = float(operands[0]), float(operands[1])
+                    end_point = _transform_point(ctm, x, y)
+                except Exception:
+                    continue
+                current_path.append(
+                    {"kind": "line", "points": [*current_point, *end_point], "line_width": record_line_width()}
+                )
+                current_point = end_point
+                continue
+            if operator == b"re":
+                try:
+                    x, y, w, h = (float(val) for val in operands[:4])
+                except Exception:
+                    continue
+                corners = [
+                    _transform_point(ctm, x, y),
+                    _transform_point(ctm, x + w, y),
+                    _transform_point(ctm, x + w, y + h),
+                    _transform_point(ctm, x, y + h),
+                ]
+                bbox = _bbox_from_points(corners)
+                if current_path:
+                    subpaths.append(current_path)
+                    current_path = []
+                subpaths.append([{"kind": "rect", "bbox": bbox, "line_width": record_line_width()}])
+                continue
+            if operator in (b"c", b"v", b"y"):
+                points = []
+                try:
+                    if operator == b"c":
+                        coords = [float(val) for val in operands[:6]]
+                        if current_point:
+                            points.append(current_point)
+                        points.extend(
+                            [
+                                _transform_point(ctm, coords[0], coords[1]),
+                                _transform_point(ctm, coords[2], coords[3]),
+                                _transform_point(ctm, coords[4], coords[5]),
+                            ]
+                        )
+                        current_point = points[-1]
+                    elif operator == b"v":
+                        coords = [float(val) for val in operands[:4]]
+                        if current_point:
+                            points.append(current_point)
+                        points.extend(
+                            [
+                                _transform_point(ctm, coords[0], coords[1]),
+                                _transform_point(ctm, coords[2], coords[3]),
+                            ]
+                        )
+                        current_point = points[-1] if points else current_point
+                    elif operator == b"y":
+                        coords = [float(val) for val in operands[:4]]
+                        if current_point:
+                            points.append(current_point)
+                        points.extend(
+                            [
+                                _transform_point(ctm, coords[0], coords[1]),
+                                _transform_point(ctm, coords[2], coords[3]),
+                            ]
+                        )
+                        current_point = points[-1]
+                except Exception:
+                    points = []
+                if points:
+                    current_path.append({"kind": "curve", "points": points, "line_width": record_line_width()})
+                continue
+            if operator in paint_ops:
+                if current_path:
+                    subpaths.append(current_path)
+                    current_path = []
+                for sp in subpaths:
+                    classify_path(sp)
+                subpaths = []
+                continue
+            if operator in reset_ops:
+                current_path = []
+                subpaths = []
+                continue
+
+    resources = page.get("/Resources")
+    if hasattr(resources, "get_object"):
+        resources = resources.get_object()
+    parse_stream(stream, resources, start_ctm=[1.0, 0.0, 0.0, 1.0, 0.0, 0.0], start_line_width=1.0)
+
+    if line_segments:
+        underline_max_stroke = 2.5
+        rect_max_stroke = 2.5
+        rect_min_height = 12.0
+        rect_max_height = max_text_box_height
+
+        horizontal_lines = [
+            seg for seg in line_segments
+            if seg["length"] >= min_line_len
+            and bottom + 2 < seg["y"] < top - 2
+        ]
+        vertical_lines = [
+            seg for seg in vertical_segments
+            if seg["length"] >= min_box
+        ]
+
+        used_lines = set()
+
+        def has_vertical_at(x, y_low, y_high):
+            for v in vertical_lines:
+                if abs(v["x"] - x) > 2.5:
+                    continue
+                if v["length"] < rect_min_height:
+                    continue
+                if v["y1"] <= y_low + 2.5 and v["y2"] >= y_high - 2.5:
+                    return True
+            return False
+
+        def has_internal_line(x1, x2, y_low, y_high):
+            for line in horizontal_lines:
+                if line["y"] <= y_low + 3 or line["y"] >= y_high - 3:
+                    continue
+                overlap = min(x2, line["x2"]) - max(x1, line["x1"])
+                if overlap <= 0:
+                    continue
+                max_width = max(x2 - x1, line["x2"] - line["x1"])
+                if max_width <= 0:
+                    continue
+                if (overlap / max_width) >= 0.8:
+                    return True
+            return False
+
+        rect_candidates = [
+            (idx, seg) for idx, seg in enumerate(horizontal_lines)
+            if seg["stroke"] <= rect_max_stroke
+        ]
+        rect_candidates.sort(key=lambda item: item[1]["y"])
+
+        for i, (idx, top_seg) in enumerate(rect_candidates):
+            for j in range(i + 1, len(rect_candidates)):
+                idx2, bottom_seg = rect_candidates[j]
+                y_diff = bottom_seg["y"] - top_seg["y"]
+                if y_diff < rect_min_height:
+                    continue
+                if y_diff > rect_max_height:
+                    break
+                overlap = min(top_seg["x2"], bottom_seg["x2"]) - max(top_seg["x1"], bottom_seg["x1"])
+                if overlap <= 0:
+                    continue
+                max_width = max(top_seg["x2"] - top_seg["x1"], bottom_seg["x2"] - bottom_seg["x1"])
+                if max_width <= 0:
+                    continue
+                if (overlap / max_width) < 0.8:
+                    continue
+                x1 = max(top_seg["x1"], bottom_seg["x1"])
+                x2 = min(top_seg["x2"], bottom_seg["x2"])
+                if x2 - x1 < 20:
+                    continue
+                y_low = top_seg["y"]
+                y_high = bottom_seg["y"]
+                if y_high <= y_low:
+                    y_low, y_high = y_high, y_low
+                if not (has_vertical_at(x1, y_low, y_high) and has_vertical_at(x2, y_low, y_high)):
+                    continue
+                if has_internal_line(x1, x2, y_low, y_high):
+                    continue
+                used_lines.add(idx)
+                used_lines.add(idx2)
+                rect = [x1 + 1.5, y_low + 1.5, x2 - 1.5, y_high - 1.5]
+                rect = _clamp_rect(rect, page)
+                height = rect[3] - rect[1]
+                if height < rect_min_height:
+                    continue
+                fields.append({"type": "text", "rect": rect, "multiline": height >= 24})
+                break
+
+        for idx, seg in enumerate(horizontal_lines):
+            if seg["stroke"] > underline_max_stroke:
+                continue
+            if idx in used_lines:
+                continue
+            bbox = [seg["x1"], seg["y"], seg["x2"], seg["y"]]
+            add_text_field_from_line(bbox, seg["stroke"])
+
+    return _dedupe_field_specs(fields)
+
+
+def _apply_detected_fields(writer, fields_by_page):
+    field_array = ArrayObject()
+    default_da = "/Helv 12 Tf 0 g"
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+    zapf_font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/ZapfDingbats"),
+        }
+    )
+    zapf_ref = writer._add_object(zapf_font)
+    dr = DictionaryObject(
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/Helv"): font_ref, NameObject("/ZaDb"): zapf_ref}
+            )
+        }
+    )
+    border = ArrayObject([NumberObject(0), NumberObject(0), NumberObject(0)])
+
+    def make_empty_appearance(width, height, font_resource=None):
+        stream = DecodedStreamObject()
+        stream.set_data(b"")
+        resources = DictionaryObject()
+        if font_resource is not None:
+            resources[NameObject("/Font")] = font_resource
+        stream.update(
+            {
+                NameObject("/Type"): NameObject("/XObject"),
+                NameObject("/Subtype"): NameObject("/Form"),
+                NameObject("/BBox"): ArrayObject(
+                    [FloatObject(0), FloatObject(0), FloatObject(width), FloatObject(height)]
+                ),
+                NameObject("/Resources"): resources,
+            }
+        )
+        return writer._add_object(stream)
+
+    def make_checkbox_appearance(width, height):
+        size = max(6.0, min(width, height) * 0.8)
+        tx = max(0.5, (width - size) / 2)
+        ty = max(0.5, (height - size) / 2)
+        stream = DecodedStreamObject()
+        commands = (
+            f"BT /ZaDb {size:.2f} Tf 0 0 0 rg "
+            f"1 0 0 1 {tx:.2f} {ty:.2f} Tm (4) Tj ET"
+        )
+        stream.set_data(commands.encode("ascii"))
+        stream.update(
+            {
+                NameObject("/Type"): NameObject("/XObject"),
+                NameObject("/Subtype"): NameObject("/Form"),
+                NameObject("/BBox"): ArrayObject(
+                    [FloatObject(0), FloatObject(0), FloatObject(width), FloatObject(height)]
+                ),
+                NameObject("/Resources"): DictionaryObject(
+                    {
+                        NameObject("/Font"): DictionaryObject(
+                            {NameObject("/ZaDb"): zapf_ref}
+                        )
+                    }
+                ),
+            }
+        )
+        return writer._add_object(stream)
+
+    def make_radio_appearance(width, height):
+        radius = min(width, height) * 0.28
+        cx = width / 2
+        cy = height / 2
+        k = 0.552284749831
+        r = radius
+        x0 = cx - r
+        y0 = cy
+        x1 = cx - r
+        y1 = cy + k * r
+        x2 = cx - k * r
+        y2 = cy + r
+        x3 = cx
+        y3 = cy + r
+        x4 = cx + k * r
+        y4 = cy + r
+        x5 = cx + r
+        y5 = cy + k * r
+        x6 = cx + r
+        y6 = cy
+        x7 = cx + r
+        y7 = cy - k * r
+        x8 = cx + k * r
+        y8 = cy - r
+        x9 = cx
+        y9 = cy - r
+        x10 = cx - k * r
+        y10 = cy - r
+        x11 = cx - r
+        y11 = cy - k * r
+        stream = DecodedStreamObject()
+        commands = (
+            f"0 0 0 rg {x0} {y0} m "
+            f"{x1} {y1} {x2} {y2} {x3} {y3} c "
+            f"{x4} {y4} {x5} {y5} {x6} {y6} c "
+            f"{x7} {y7} {x8} {y8} {x9} {y9} c "
+            f"{x10} {y10} {x11} {y11} {x0} {y0} c f"
+        )
+        stream.set_data(commands.encode("ascii"))
+        stream.update(
+            {
+                NameObject("/Type"): NameObject("/XObject"),
+                NameObject("/Subtype"): NameObject("/Form"),
+                NameObject("/BBox"): ArrayObject(
+                    [FloatObject(0), FloatObject(0), FloatObject(width), FloatObject(height)]
+                ),
+                NameObject("/Resources"): DictionaryObject(),
+            }
+        )
+        return writer._add_object(stream)
+
+    field_index = 1
+    for page_index, page_fields in enumerate(fields_by_page):
+        if not page_fields:
+            continue
+        page = writer.pages[page_index]
+        annotations = page.get("/Annots")
+        if annotations is None:
+            annotations = ArrayObject()
+        elif hasattr(annotations, "get_object"):
+            annotations = annotations.get_object()
+        if not isinstance(annotations, ArrayObject):
+            annotations = ArrayObject(annotations)
+        page[NameObject("/Annots")] = annotations
+        page_ref = getattr(page, "indirect_ref", None)
+
+        for field in page_fields:
+            rect = field["rect"]
+            rect_width = rect[2] - rect[0]
+            rect_height = rect[3] - rect[1]
+            rect_obj = ArrayObject([FloatObject(val) for val in rect])
+            field_name = f"auto_{field_index}"
+            field_index += 1
+
+            if field["type"] in ("checkbox", "radio"):
+                ff = 0
+                check_size = max(8.0, min(18.0, rect_height * 0.9))
+                check_da = f"/ZaDb {check_size:.1f} Tf 0 g"
+                if field["type"] == "radio":
+                    ff |= 32768
+                    on_ref = make_radio_appearance(rect_width, rect_height)
+                else:
+                    on_ref = make_checkbox_appearance(rect_width, rect_height)
+                off_ref = make_empty_appearance(rect_width, rect_height)
+                widget = DictionaryObject(
+                    {
+                        NameObject("/Type"): NameObject("/Annot"),
+                        NameObject("/Subtype"): NameObject("/Widget"),
+                        NameObject("/Rect"): rect_obj,
+                        NameObject("/AS"): NameObject("/Off"),
+                        NameObject("/F"): NumberObject(4),
+                        NameObject("/Border"): border,
+                        NameObject("/DA"): TextStringObject(check_da),
+                        NameObject("/DR"): dr,
+                        NameObject("/MK"): DictionaryObject(
+                            {NameObject("/CA"): TextStringObject("4")}
+                        ),
+                        NameObject("/AP"): DictionaryObject(
+                            {
+                                NameObject("/N"): DictionaryObject(
+                                    {
+                                        NameObject("/Yes"): on_ref,
+                                        NameObject("/On"): on_ref,
+                                        NameObject("/Off"): off_ref,
+                                    }
+                                )
+                            }
+                        ),
+                    }
+                )
+                if page_ref is not None:
+                    widget[NameObject("/P")] = page_ref
+                widget_ref = writer._add_object(widget)
+                annot = DictionaryObject(
+                    {
+                        NameObject("/FT"): NameObject("/Btn"),
+                        NameObject("/T"): TextStringObject(field_name),
+                        NameObject("/V"): NameObject("/Off"),
+                        NameObject("/Ff"): NumberObject(ff),
+                        NameObject("/DA"): TextStringObject(check_da),
+                        NameObject("/DR"): dr,
+                        NameObject("/Kids"): ArrayObject([widget_ref]),
+                    }
+                )
+            else:
+                ff = 4096 if field.get("multiline") else 0
+                font_size = max(9.0, min(12.0, rect_height * 0.8))
+                field_da = f"/Helv {font_size:.1f} Tf 0 g"
+                widget = DictionaryObject(
+                    {
+                        NameObject("/Type"): NameObject("/Annot"),
+                        NameObject("/Subtype"): NameObject("/Widget"),
+                        NameObject("/Rect"): rect_obj,
+                        NameObject("/F"): NumberObject(4),
+                        NameObject("/Border"): border,
+                        NameObject("/DA"): TextStringObject(field_da),
+                        NameObject("/DR"): dr,
+                    }
+                )
+                if page_ref is not None:
+                    widget[NameObject("/P")] = page_ref
+                widget_ref = writer._add_object(widget)
+                annot = DictionaryObject(
+                    {
+                        NameObject("/FT"): NameObject("/Tx"),
+                        NameObject("/T"): TextStringObject(field_name),
+                        NameObject("/V"): TextStringObject(""),
+                        NameObject("/Ff"): NumberObject(ff),
+                        NameObject("/DA"): TextStringObject(field_da),
+                        NameObject("/DR"): dr,
+                        NameObject("/Kids"): ArrayObject([widget_ref]),
+                    }
+                )
+            annot_ref = writer._add_object(annot)
+            widget[NameObject("/Parent")] = annot_ref
+            annotations.append(widget_ref)
+            field_array.append(annot_ref)
+
+    if field_array:
+        form = DictionaryObject(
+            {
+                NameObject("/Fields"): field_array,
+                NameObject("/NeedAppearances"): BooleanObject(True),
+                NameObject("/DA"): TextStringObject(default_da),
+                NameObject("/DR"): dr,
+            }
+        )
+        writer._root_object.update({NameObject("/AcroForm"): form})
+
+
+def _detect_checkbox_fields_from_raster(doc, page_index, page):
+    pdf_page = doc[page_index]
+    scale = 2.0
+    bitmap = pdf_page.render(scale=scale)
+    image = bitmap.to_pil().convert("L")
+    width, height = image.size
+    pixels = image.tobytes()
+    visited = bytearray(width * height)
+    threshold = 170
+    min_px = int(5 * scale)
+    max_px = int(30 * scale)
+    max_fill_ratio = 0.35
+    fields = []
+
+    def to_pdf_rect(x1, y1, x2, y2):
+        return [
+            x1 / scale,
+            (height - y2) / scale,
+            x2 / scale,
+            (height - y1) / scale,
+        ]
+
+    for y in range(height):
+        row_idx = y * width
+        for x in range(width):
+            idx = row_idx + x
+            if visited[idx]:
+                continue
+            if pixels[idx] >= threshold:
+                continue
+            stack = [idx]
+            visited[idx] = 1
+            min_x = max_x = x
+            min_y = max_y = y
+            count = 0
+            while stack:
+                cur = stack.pop()
+                count += 1
+                cy, cx = divmod(cur, width)
+                if cx < min_x:
+                    min_x = cx
+                if cx > max_x:
+                    max_x = cx
+                if cy < min_y:
+                    min_y = cy
+                if cy > max_y:
+                    max_y = cy
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if nx < 0 or nx >= width or ny < 0 or ny >= height:
+                        continue
+                    n_idx = ny * width + nx
+                    if visited[n_idx]:
+                        continue
+                    if pixels[n_idx] >= threshold:
+                        continue
+                    visited[n_idx] = 1
+                    stack.append(n_idx)
+            box_w = max_x - min_x + 1
+            box_h = max_y - min_y + 1
+            if box_w < min_px or box_h < min_px:
+                continue
+            if box_w > max_px or box_h > max_px:
+                continue
+            ratio = box_w / box_h if box_h else 0
+            if ratio < 0.7 or ratio > 1.3:
+                continue
+            area = box_w * box_h
+            if area <= 0:
+                continue
+            fill_ratio = count / area
+            if fill_ratio > max_fill_ratio:
+                continue
+            rect = to_pdf_rect(min_x, min_y, max_x + 1, max_y + 1)
+            rect = _clamp_rect(rect, page)
+            fields.append({"type": "checkbox", "rect": rect})
+
+    return _dedupe_field_specs(fields)
+
+
+def _detect_line_fields_from_raster(doc, page_index, page):
+    pdf_page = doc[page_index]
+    scale = 2.0
+    bitmap = pdf_page.render(scale=scale)
+    image = bitmap.to_pil().convert("L")
+    width, height = image.size
+    pixels = image.tobytes()
+    threshold = 170
+    min_len_px = max(6, int(6 * scale))
+    max_thickness_px = max(2, int(2 * scale))
+    overlap_ratio = 0.7
+    edge_tol_px = max(2, int(2 * scale))
+    min_rect_height_px = max(10, int(10 * scale))
+    max_rect_height_px = max(min_rect_height_px + 6, int(120 * scale))
+    min_rect_width_px = max(30, int(20 * scale))
+    fields = []
+
+    horizontal_lines = []
+    active = []
+
+    for y in range(height):
+        row = pixels[y * width : (y + 1) * width]
+        segments = []
+        x = 0
+        while x < width:
+            while x < width and row[x] >= threshold:
+                x += 1
+            if x >= width:
+                break
+            start = x
+            while x < width and row[x] < threshold:
+                x += 1
+            end = x - 1
+            if end - start + 1 >= min_len_px:
+                segments.append((start, end))
+
+        matched = [False] * len(segments)
+        new_active = []
+        for ax1, ax2, ay1, ay2 in active:
+            found = False
+            for idx, (sx1, sx2) in enumerate(segments):
+                if matched[idx]:
+                    continue
+                overlap = min(ax2, sx2) - max(ax1, sx1)
+                if overlap <= 0:
+                    continue
+                min_width = min(ax2 - ax1, sx2 - sx1)
+                if min_width <= 0:
+                    continue
+                if (overlap / min_width) < overlap_ratio:
+                    continue
+                new_active.append((min(ax1, sx1), max(ax2, sx2), ay1, y))
+                matched[idx] = True
+                found = True
+                break
+            if not found:
+                if ay2 - ay1 + 1 <= max_thickness_px:
+                    horizontal_lines.append((ax1, ax2, ay1, ay2))
+        for idx, (sx1, sx2) in enumerate(segments):
+            if not matched[idx]:
+                new_active.append((sx1, sx2, y, y))
+        active = new_active
+
+    for ax1, ax2, ay1, ay2 in active:
+        if ay2 - ay1 + 1 <= max_thickness_px:
+            horizontal_lines.append((ax1, ax2, ay1, ay2))
+
+    vertical_lines = []
+    active = []
+
+    for x in range(width):
+        segments = []
+        y = 0
+        while y < height:
+            while y < height and pixels[(y * width) + x] >= threshold:
+                y += 1
+            if y >= height:
+                break
+            start = y
+            while y < height and pixels[(y * width) + x] < threshold:
+                y += 1
+            end = y - 1
+            if end - start + 1 >= min_len_px:
+                segments.append((start, end))
+
+        matched = [False] * len(segments)
+        new_active = []
+        for ay1, ay2, ax1, ax2 in active:
+            found = False
+            for idx, (sy1, sy2) in enumerate(segments):
+                if matched[idx]:
+                    continue
+                overlap = min(ay2, sy2) - max(ay1, sy1)
+                if overlap <= 0:
+                    continue
+                min_len = min(ay2 - ay1, sy2 - sy1)
+                if min_len <= 0:
+                    continue
+                if (overlap / min_len) < overlap_ratio:
+                    continue
+                new_active.append((min(ay1, sy1), max(ay2, sy2), ax1, x))
+                matched[idx] = True
+                found = True
+                break
+            if not found:
+                if ax2 - ax1 + 1 <= max_thickness_px:
+                    vertical_lines.append((ax1, ax2, ay1, ay2))
+        for idx, (sy1, sy2) in enumerate(segments):
+            if not matched[idx]:
+                new_active.append((sy1, sy2, x, x))
+        active = new_active
+
+    for ay1, ay2, ax1, ax2 in active:
+        if ax2 - ax1 + 1 <= max_thickness_px:
+            vertical_lines.append((ax1, ax2, ay1, ay2))
+
+    def has_vertical_at(x_pos, y_top, y_bottom):
+        for vx1, vx2, vy1, vy2 in vertical_lines:
+            x_center = (vx1 + vx2) / 2.0
+            if abs(x_center - x_pos) > edge_tol_px:
+                continue
+            if vy1 <= y_top + edge_tol_px and vy2 >= y_bottom - edge_tol_px:
+                return True
+        return False
+
+    rects = []
+    used_lines = set()
+    horizontal_sorted = sorted(horizontal_lines, key=lambda seg: (seg[2] + seg[3]) / 2.0)
+    for i, top in enumerate(horizontal_sorted):
+        top_y = (top[2] + top[3]) / 2.0
+        for j in range(i + 1, len(horizontal_sorted)):
+            bottom = horizontal_sorted[j]
+            bottom_y = (bottom[2] + bottom[3]) / 2.0
+            height_px = bottom_y - top_y
+            if height_px < min_rect_height_px:
+                continue
+            if height_px > max_rect_height_px:
+                break
+            x1 = max(top[0], bottom[0])
+            x2 = min(top[1], bottom[1])
+            if x2 - x1 < min_rect_width_px:
+                continue
+            if not (has_vertical_at(x1, top_y, bottom_y) and has_vertical_at(x2, top_y, bottom_y)):
+                continue
+            rects.append((x1, x2, top_y, bottom_y))
+            used_lines.add(i)
+            used_lines.add(j)
+            break
+
+    inset_px = max(2, int(1.5 * scale))
+    for x1, x2, y_top, y_bottom in rects:
+        rx1 = x1 + inset_px
+        rx2 = x2 - inset_px
+        ry1 = y_top + inset_px
+        ry2 = y_bottom - inset_px
+        if rx2 <= rx1 or ry2 <= ry1:
+            continue
+        rect = [
+            rx1 / scale,
+            (height - ry2) / scale,
+            rx2 / scale,
+            (height - ry1) / scale,
+        ]
+        rect = _clamp_rect(rect, page)
+        if rect[2] - rect[0] < 10 or rect[3] - rect[1] < 8:
+            continue
+        fields.append({"type": "text", "rect": rect, "multiline": (rect[3] - rect[1]) >= 24})
+
+    for idx, (x1, x2, y1, y2) in enumerate(horizontal_sorted):
+        if idx in used_lines:
+            continue
+        if x2 <= x1:
+            continue
+        line_y = (y1 + y2) / 2.0
+        rect = [x1 / scale, (height - line_y) / scale, x2 / scale, (height - line_y) / scale + 14.0]
+        rect = _clamp_rect(rect, page)
+        if rect[2] - rect[0] < 10:
+            continue
+        fields.append({"type": "text", "rect": rect, "multiline": False})
+
+    return _dedupe_field_specs(fields)
 
 def _build_form_pdf(template, export_mode):
     img, field_specs = _render_form_background(template)
@@ -606,7 +1879,7 @@ def forgot_password(request):
         try:
             User.objects.get(email=email)
             message = (
-                "We found your account. Please email paymentsupport@plughub-ims.com "
+                "We found your account. Please email support@plughub-ims.com "
                 "with your email and birthdate for verification. Include the birthdate you entered: "
                 f"{dob if dob else 'not provided'}."
             )
@@ -906,6 +2179,201 @@ def pdf_to_image(request):
             "message": "PDF converted to images. 1 credit deducted.",
             "remaining": remaining,
             "file_name": "pdf_images.zip",
+            "file_data": encoded,
+        }
+    )
+
+
+@login_required
+def fillable_form_convert(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Invalid request method."}, status=405)
+
+    if not _can_use_advanced_tools(request.user):
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": (
+                    "Fillable Form Converter is an advanced tool. Ask your admin to enable "
+                    "advanced access for your account."
+                ),
+            },
+            status=403,
+        )
+
+    balance = _available_credits(request.user)
+    if balance <= 0:
+        return JsonResponse({"status": "error", "message": "No credits remaining. Add credits to continue."}, status=400)
+
+    uploaded = request.FILES.get("pdf")
+    if not uploaded:
+        return JsonResponse({"status": "error", "message": "Upload a PDF to continue."}, status=400)
+
+    try:
+        uploaded.seek(0)
+        uploaded_bytes = uploaded.read()
+        if not uploaded_bytes:
+            return JsonResponse({"status": "error", "message": "Upload a PDF to continue."}, status=400)
+        reader = PdfReader(BytesIO(uploaded_bytes))
+        if reader.is_encrypted:
+            try:
+                res = reader.decrypt("")
+            except Exception:
+                res = 0
+            if res in (0, False, None):
+                return JsonResponse({"status": "error", "message": "PDF is encrypted. Unlock it first."}, status=400)
+
+        writer = PdfWriter()
+        writer.clone_document_from_reader(reader)
+
+        manual_fields_by_page = None
+        if manual_fields_by_page:
+            pass
+        else:
+            acroform = writer._root_object.get("/AcroForm")
+            acroform_obj = acroform.get_object() if hasattr(acroform, "get_object") else acroform
+            widgets = _collect_widget_fields(writer.pages)
+
+            has_fields = False
+            if acroform_obj:
+                fields = acroform_obj.get("/Fields")
+                fields_obj = fields.get_object() if hasattr(fields, "get_object") else fields
+                if fields_obj and len(fields_obj) > 0:
+                    has_fields = True
+                    acroform_obj[NameObject("/NeedAppearances")] = BooleanObject(True)
+                    if acroform_obj.get("/DA") is None:
+                        acroform_obj[NameObject("/DA")] = TextStringObject("/Helv 12 Tf 0 g")
+                    font = DictionaryObject(
+                        {
+                            NameObject("/Type"): NameObject("/Font"),
+                            NameObject("/Subtype"): NameObject("/Type1"),
+                            NameObject("/BaseFont"): NameObject("/Helvetica"),
+                        }
+                    )
+                    font_ref = writer._add_object(font)
+                    zapf_font = DictionaryObject(
+                        {
+                            NameObject("/Type"): NameObject("/Font"),
+                            NameObject("/Subtype"): NameObject("/Type1"),
+                            NameObject("/BaseFont"): NameObject("/ZapfDingbats"),
+                        }
+                    )
+                    zapf_ref = writer._add_object(zapf_font)
+                    if acroform_obj.get("/DR") is None:
+                        acroform_obj[NameObject("/DR")] = DictionaryObject(
+                            {
+                                NameObject("/Font"): DictionaryObject(
+                                    {NameObject("/Helv"): font_ref, NameObject("/ZaDb"): zapf_ref}
+                                )
+                            }
+                        )
+                    else:
+                        dr_obj = acroform_obj.get("/DR")
+                        if hasattr(dr_obj, "get_object"):
+                            dr_obj = dr_obj.get_object()
+                        font_dict = dr_obj.get("/Font") if hasattr(dr_obj, "get") else None
+                        if hasattr(font_dict, "get_object"):
+                            font_dict = font_dict.get_object()
+                        if not isinstance(font_dict, DictionaryObject):
+                            font_dict = DictionaryObject()
+                        if font_dict.get("/Helv") is None:
+                            font_dict[NameObject("/Helv")] = font_ref
+                        if font_dict.get("/ZaDb") is None:
+                            font_dict[NameObject("/ZaDb")] = zapf_ref
+                        dr_obj[NameObject("/Font")] = font_dict
+                        acroform_obj[NameObject("/DR")] = dr_obj
+            if widgets and not has_fields:
+                has_fields = True
+
+            if has_fields:
+                if not acroform_obj:
+                    _build_acroform(writer, widgets)
+                elif widgets:
+                    if not acroform_obj.get("/Fields"):
+                        acroform_obj[NameObject("/Fields")] = ArrayObject(widgets)
+                    acroform_obj[NameObject("/NeedAppearances")] = BooleanObject(True)
+                message = "Fillable fields detected. 1 credit deducted."
+            else:
+                fields_by_page = [_extract_drawn_fields(reader, p) for p in reader.pages]
+                has_checkboxes = any(
+                    f["type"] in ("checkbox", "radio")
+                    for page_fields in fields_by_page
+                    for f in page_fields
+                )
+                need_raster_lines = True
+                need_raster_checkboxes = not has_checkboxes
+                if need_raster_lines or need_raster_checkboxes:
+                    tmp_path = None
+                    try:
+                        fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+                        os.close(fd)
+                        with open(tmp_path, "wb") as tmp:
+                            tmp.write(uploaded_bytes)
+                            tmp.flush()
+                        doc = pdfium.PdfDocument(tmp_path)
+                        for page_index, page in enumerate(reader.pages):
+                            if need_raster_lines:
+                                raster_lines = _detect_line_fields_from_raster(doc, page_index, page)
+                                if raster_lines:
+                                    fields_by_page[page_index].extend(raster_lines)
+                            if need_raster_checkboxes:
+                                raster_fields = _detect_checkbox_fields_from_raster(doc, page_index, page)
+                                if raster_fields:
+                                    fields_by_page[page_index].extend(raster_fields)
+                            if fields_by_page[page_index]:
+                                fields_by_page[page_index] = _dedupe_field_specs(
+                                    fields_by_page[page_index]
+                                )
+                    finally:
+                        if tmp_path:
+                            try:
+                                os.unlink(tmp_path)
+                            except OSError:
+                                pass
+                fields_by_page = [
+                    _remove_text_overlaps(_dedupe_field_specs(page_fields))
+                    if page_fields
+                    else page_fields
+                    for page_fields in fields_by_page
+                ]
+                total_fields = sum(len(page_fields) for page_fields in fields_by_page)
+                if total_fields <= 0:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": (
+                                "No lines, checkboxes, or radio buttons were detected. "
+                                "Try another PDF or use the PDF Form Creator."
+                            ),
+                        },
+                        status=400,
+                    )
+                _apply_detected_fields(writer, fields_by_page)
+                message = f"Fillable fields added ({total_fields}). 1 credit deducted."
+
+        output = BytesIO()
+        writer.write(output)
+        output.seek(0)
+        encoded = base64.b64encode(output.read()).decode("ascii")
+    except Exception:
+        logger.exception("fillable_form_convert failed")
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": "Unable to convert PDF to a fillable form. Please check the file and try again.",
+            },
+            status=400,
+        )
+
+    ServiceUsage.objects.create(user=request.user, tool_slug="fillable-form-converter")
+    remaining = _available_credits(request.user)
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "message": message,
+            "remaining": remaining,
+            "file_name": f"fillable_{uploaded.name}",
             "file_data": encoded,
         }
     )

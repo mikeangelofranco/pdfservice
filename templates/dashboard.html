@@ -73,6 +73,24 @@
                 <p>Design fillable forms and generate PDFs.</p>
             </div>
         </a>
+        <button
+            type="button"
+            class="card action-card tool-card tool-card--advanced tool-card--left"
+            data-slug="fillable-form-converter"
+            data-name="Fillable Form Converter"
+            data-description="Convert existing PDFs into fillable forms."
+            data-credits="{{ credit_balance }}"
+        >
+            <span class="tool-advanced-badge">ADVANCED</span>
+            <div>
+                <div class="pill small">ADV</div>
+                <div class="tool-header">
+                    <span class="tool-icon icon-convert"></span>
+                    <span class="card-title">Fillable Form Converter</span>
+                </div>
+                <p>Convert existing PDFs into fillable forms.</p>
+            </div>
+        </button>
     </div>
 </section>
 
@@ -356,9 +374,11 @@
             const isMerge = currentSlug === 'pdf-merge';
             const isSplit = currentSlug === 'pdf-split';
             const isToImage = currentSlug === 'pdf-to-image';
+            const isFillable = currentSlug === 'fillable-form-converter';
             const isImageToPdf = currentSlug === 'image-to-pdf';
             const isRemove = currentSlug === 'remove-pages';
             const isRedact = currentSlug === 'redact-text';
+            const usesToImage = isToImage || isFillable;
 
             titleEl.textContent = name;
             descEl.textContent = desc;
@@ -391,8 +411,8 @@
                 splitFields.style.display = isSplit ? 'grid' : 'none';
             }
             if (toImageFields) {
-                toImageFields.hidden = !isToImage;
-                toImageFields.style.display = isToImage ? 'grid' : 'none';
+                toImageFields.hidden = !usesToImage;
+                toImageFields.style.display = usesToImage ? 'grid' : 'none';
             }
             if (imageToPdfFields) {
                 imageToPdfFields.hidden = !isImageToPdf;
@@ -406,13 +426,14 @@
                 redactFields.hidden = !isRedact;
                 redactFields.style.display = isRedact ? 'grid' : 'none';
             }
-            if (submitBtn) submitBtn.textContent = isLock ? 'Lock PDF' : (isUnlock ? 'Unlock PDF' : (isMerge ? 'Merge PDF' : (isSplit ? 'Split PDF' : (isToImage ? 'Convert to Image' : (isImageToPdf ? 'Convert to PDF' : (isRemove ? 'Remove page' : (isRedact ? 'Redact text' : 'Launch service')))))));
+            if (submitBtn) submitBtn.textContent = isLock ? 'Lock PDF' : (isUnlock ? 'Unlock PDF' : (isMerge ? 'Merge PDF' : (isSplit ? 'Split PDF' : (isToImage ? 'Convert to Image' : (isFillable ? 'Convert to Fillable' : (isImageToPdf ? 'Convert to PDF' : (isRemove ? 'Remove page' : (isRedact ? 'Redact text' : 'Launch service'))))))));
             if (passwordLabel) passwordLabel.textContent = isUnlock ? 'Password to unlock' : 'Password';
             if (passwordInput) {
                 passwordInput.placeholder = isUnlock ? 'Enter the password to unlock the PDF' : 'Enter a password to protect the PDF';
             }
             if (downloadLink) downloadLink.textContent = isUnlock ? 'Download unlocked PDF' : (isLock ? 'Download locked PDF' : 'Download PDF');
             if (mergeDownloadLink) mergeDownloadLink.textContent = 'Download merged PDF';
+            if (toImageDownloadLink) toImageDownloadLink.textContent = isFillable ? 'Download fillable PDF' : 'Download Image';
             if (pdfInput) pdfInput.value = '';
             if (passwordInput) passwordInput.value = '';
             syncFileLabel();
@@ -502,6 +523,7 @@
             downloadReady = false;
             downloaded = false;
             backdrop.hidden = false;
+            document.body.classList.add('modal-open');
         }
 
         function closeModal() {
@@ -512,12 +534,14 @@
                         ? 'Download your merged PDF now; closing will clear the link and require another credit.'
                     : currentSlug === 'pdf-split'
                         ? 'Download your split PDF now; closing will clear the link and require another credit.'
-                        : currentSlug === 'pdf-to-image'
-                            ? 'Download your converted images now; closing will clear the link and require another credit.'
-                        : currentSlug === 'image-to-pdf'
-                            ? 'Download your converted PDF now; closing will clear the link and require another credit.'
-                        : currentSlug === 'redact-text'
-                            ? 'Download your redacted PDF now; closing will clear the link and require another credit.'
+                    : currentSlug === 'pdf-to-image'
+                        ? 'Download your converted images now; closing will clear the link and require another credit.'
+                    : currentSlug === 'fillable-form-converter'
+                        ? 'Download your converted PDF now; closing will clear the link and require another credit.'
+                    : currentSlug === 'image-to-pdf'
+                        ? 'Download your converted PDF now; closing will clear the link and require another credit.'
+                    : currentSlug === 'redact-text'
+                        ? 'Download your redacted PDF now; closing will clear the link and require another credit.'
                         : 'Download your locked PDF now; closing will clear the link and require another credit.';
                 messageEl.classList.remove('error', 'info');
                 messageEl.classList.add('warning');
@@ -533,6 +557,7 @@
             currentSlug = null;
             downloadReady = false;
             downloaded = false;
+            document.body.classList.remove('modal-open');
         }
 
         function handleSubmit() {
@@ -563,6 +588,12 @@
             }
             if (downloadReady && !downloaded && currentSlug === 'pdf-to-image') {
                 messageEl.textContent = 'Download your converted images before converting again to avoid spending another credit.';
+                messageEl.classList.remove('error', 'warning', 'info');
+                messageEl.classList.add('warning');
+                return;
+            }
+            if (downloadReady && !downloaded && currentSlug === 'fillable-form-converter') {
+                messageEl.textContent = 'Download your converted PDF before converting again to avoid spending another credit.';
                 messageEl.classList.remove('error', 'warning', 'info');
                 messageEl.classList.add('warning');
                 return;
@@ -605,6 +636,9 @@
             }
             if (currentSlug === 'pdf-to-image') {
                 return handlePdfToImage();
+            }
+            if (currentSlug === 'fillable-form-converter') {
+                return handleFillableConverter();
             }
             if (currentSlug === 'image-to-pdf') {
                 return handleImageToPdf();
@@ -1013,7 +1047,7 @@
             });
         }
 
-        document.querySelectorAll('.tool-card:not(.tool-card--advanced)').forEach(btn => {
+        document.querySelectorAll('.tool-card[data-slug]').forEach(btn => {
             btn.addEventListener('click', () => openModal(btn));
         });
 
@@ -1103,6 +1137,83 @@
                 }
             }).catch(err => {
                 messageEl.textContent = err.message || 'Unable to convert PDF to images.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                if (toImageDownloadWrap && toImageDownloadLink) {
+                    toImageDownloadWrap.hidden = true;
+                    toImageDownloadLink.removeAttribute('href');
+                    toImageDownloadLink.classList.add('disabled');
+                    toImageDownloadLink.setAttribute('aria-disabled', 'true');
+                    toImageDownloadLink.classList.remove('highlight');
+                }
+                downloadReady = false;
+            });
+        }
+
+        function handleFillableConverter() {
+            if (currentCredits <= 0) {
+                messageEl.textContent = 'No credits remaining. Add credits to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (!toImageInput || !toImageInput.files.length) {
+                messageEl.textContent = 'Upload a PDF to continue.';
+                messageEl.classList.remove('warning', 'info');
+                messageEl.classList.add('error');
+                return;
+            }
+            if (toImageDownloadWrap && toImageDownloadLink) {
+                toImageDownloadWrap.hidden = true;
+                toImageDownloadLink.removeAttribute('href');
+                toImageDownloadLink.classList.add('disabled');
+                toImageDownloadLink.setAttribute('aria-disabled', 'true');
+                toImageDownloadLink.classList.remove('highlight');
+            }
+            downloadReady = false;
+            downloaded = false;
+
+            const formData = new FormData();
+            formData.append('pdf', toImageInput.files[0]);
+
+            messageEl.textContent = 'Converting to fillable form...';
+            messageEl.classList.remove('error', 'warning', 'info');
+            fetch(`{% url 'fillable_form_convert' %}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to convert PDF to fillable form.');
+                }
+                updateCreditsUI(data.remaining);
+                messageEl.textContent = data.message || 'Fillable PDF ready.';
+                messageEl.classList.remove('error', 'warning');
+                downloadReady = true;
+                downloaded = false;
+                if (data.file_data && toImageDownloadLink && toImageDownloadWrap) {
+                    const byteCharacters = atob(data.file_data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    toImageDownloadLink.href = url;
+                    toImageDownloadLink.download = data.file_name || 'fillable.pdf';
+                    toImageDownloadLink.classList.remove('disabled');
+                    toImageDownloadLink.removeAttribute('aria-disabled');
+                    toImageDownloadLink.classList.add('highlight');
+                    toImageDownloadWrap.hidden = false;
+                }
+            }).catch(err => {
+                messageEl.textContent = err.message || 'Unable to convert PDF to fillable form.';
                 messageEl.classList.remove('warning', 'info');
                 messageEl.classList.add('error');
                 if (toImageDownloadWrap && toImageDownloadLink) {

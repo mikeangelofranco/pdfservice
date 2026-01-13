@@ -18,6 +18,7 @@ urlpatterns = [
     path('tool/pdf-merge/process/', views.pdf_merge, name='pdf_merge'),
     path('tool/pdf-split/process/', views.pdf_split, name='pdf_split'),
     path('tool/pdf-to-image/process/', views.pdf_to_image, name='pdf_to_image'),
+    path('tool/fillable-form-converter/process/', views.fillable_form_convert, name='fillable_form_convert'),
     path('tool/image-to-pdf/process/', views.image_to_pdf, name='image_to_pdf'),
     path('tool/remove-pages/process/', views.remove_pages, name='remove_pages'),
     path('tool/remove-pages/inspect/', views.remove_pages_inspect, name='remove_pages_inspect'),

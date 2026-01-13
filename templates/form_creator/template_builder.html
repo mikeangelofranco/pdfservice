@@ -156,6 +156,7 @@
                     <p class="fc-group-note">Drag or click to place fields on the page.</p>
                     <div class="palette-grid" data-palette-grid>
                         <button class="palette-item" type="button" draggable="true" data-field-type="text">Text</button>
+                        <button class="palette-item" type="button" draggable="true" data-field-type="text_line">Text line</button>
                         <button class="palette-item" type="button" draggable="true" data-field-type="multiline">Multiline text</button>
                         <button class="palette-item" type="button" draggable="true" data-field-type="number">Number</button>
                         <button class="palette-item" type="button" draggable="true" data-field-type="date">Date</button>
@@ -173,6 +174,7 @@
                             <label class="field-label" for="fc-add-type">Quick add</label>
                             <select id="fc-add-type" data-add-type>
                                 <option value="text">Text</option>
+                                <option value="text_line">Text line</option>
                                 <option value="multiline">Multiline text</option>
                                 <option value="number">Number</option>
                                 <option value="date">Date</option>
@@ -363,6 +365,7 @@
 
         const FIELD_TYPES = {
             text: { label: 'Text', w: 0.4, h: 0.05 },
+            text_line: { label: 'Text line', w: 0.5, h: 0.05 },
             multiline: { label: 'Multiline', w: 0.6, h: 0.12 },
             number: { label: 'Number', w: 0.25, h: 0.05 },
             date: { label: 'Date', w: 0.25, h: 0.05 },
@@ -787,6 +790,14 @@
                         <div class="canvas-checkbox"></div>
                         <div class="canvas-checkbox-label">${label}</div>
                     `;
+                } else if (field.type === 'text_line') {
+                    item.classList.add('canvas-item--text-line');
+                    const labelText = field.label || FIELD_TYPES[field.type]?.label || 'Label';
+                    const labelValue = labelText.trim().endsWith(':') ? labelText.trim() : `${labelText.trim()}:`;
+                    item.innerHTML = `
+                        <div class="canvas-label canvas-label--inline">${labelValue}</div>
+                        <div class="canvas-line"></div>
+                    `;
                 } else {
                     const label = document.createElement('div');
                     label.className = 'canvas-label';
@@ -853,7 +864,7 @@
             const isInput = !['section', 'heading', 'paragraph', 'table'].includes(field.type);
             const showPlaceholder = ['text', 'multiline'].includes(field.type);
             const showOptions = ['dropdown', 'radio'].includes(field.type);
-            const showValidation = ['text', 'multiline', 'number', 'date'].includes(field.type);
+            const showValidation = ['text', 'text_line', 'multiline', 'number', 'date'].includes(field.type);
             const showDivider = field.type === 'section' || field.type === 'heading';
             const showDefault = isInput;
             const showFontSize = field.type !== 'table';
@@ -1253,7 +1264,7 @@
             const isInput = !['section', 'heading', 'paragraph', 'table'].includes(currentField.type);
             const showPlaceholder = ['text', 'multiline'].includes(currentField.type);
             const showOptions = ['dropdown', 'radio'].includes(currentField.type);
-            const showValidation = ['text', 'multiline', 'number', 'date'].includes(currentField.type);
+            const showValidation = ['text', 'text_line', 'multiline', 'number', 'date'].includes(currentField.type);
             const showDivider = currentField.type === 'section' || currentField.type === 'heading';
             const showDefault = isInput;
             const showFontSize = currentField.type !== 'table';

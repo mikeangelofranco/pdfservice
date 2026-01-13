@@ -43,6 +43,7 @@ class FormTemplate(models.Model):
 class FormField(models.Model):
     FIELD_TYPES = [
         ("text", "Text"),
+        ("text_line", "Text line"),
         ("multiline", "Multiline text"),
         ("number", "Number"),
         ("date", "Date"),

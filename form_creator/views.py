@@ -35,7 +35,7 @@ from .models import FormField, FormTemplate
 logger = logging.getLogger(__name__)
 
 ADVANCED_TOOL_SLUG = "pdf-form-creator"
-SUPPORTED_FILLABLE = {"text", "multiline", "number", "checkbox", "radio", "date"}
+SUPPORTED_FILLABLE = {"text", "text_line", "multiline", "number", "checkbox", "radio", "date"}
 
 
 def _available_credits(user):
@@ -596,6 +596,7 @@ def _build_pdf(template, fields, output_mode):
         field_font_pt = parse_font_size(font_size_override, 12)
         field_font = _load_pdf_font(int(field_font_pt * render_scale))
         field_line_height = calc_line_height(field_font)
+        line_rect = None
 
         if field.type in ("section", "heading", "paragraph"):
             title = field.label or "Section"
@@ -640,6 +641,38 @@ def _build_pdf(template, fields, output_mode):
                 outline="#222222",
                 width=line_width,
             )
+        elif field.type == "text_line":
+            label_text = label if label.rstrip().endswith(":") else f"{label}:"
+            label_y = y_px + max(0, (h_px - field_line_height) / 2)
+            try:
+                label_width = draw.textlength(label_text, font=field_font)
+            except Exception:
+                label_width = len(label_text) * (6 * render_scale)
+            line_start = x_px + label_width + label_gap
+            min_line_width = 12 * render_scale
+            max_start = x_px + w_px - min_line_width
+            if line_start > max_start:
+                line_start = max(x_px + label_inset, max_start)
+            line_y = label_y + field_line_height - (2 * render_scale)
+            draw.text((x_px, label_y), label_text, fill="black", font=field_font)
+            draw.line(
+                (line_start, line_y, x_px + w_px, line_y),
+                fill="#222222",
+                width=line_width,
+            )
+            line_start_pt = line_start / render_scale
+            line_y_pt = line_y / render_scale
+            text_height_pt = max(12.0, field_line_height / render_scale)
+            rect_bottom = max(0.0, page_height - line_y_pt)
+            rect_top = min(page_height, page_height - (line_y_pt - text_height_pt))
+            if rect_top <= rect_bottom:
+                rect_top = min(page_height, rect_bottom + text_height_pt)
+            line_rect = [
+                float(line_start_pt),
+                float(rect_bottom),
+                float(x_pt + w_pt),
+                float(rect_top),
+            ]
         elif field.type == "signature":
             draw.text(
                 (x_px + label_inset, y_px + label_inset),
@@ -866,6 +899,8 @@ def _build_pdf(template, fields, output_mode):
                     float(x_pt + box_size),
                     float(page_height - y_pt),
                 ]
+            elif field.type == "text_line" and line_rect:
+                rect = line_rect
             else:
                 label_pad_pt = (field_line_height + label_gap) / render_scale
                 min_input_height = 12
